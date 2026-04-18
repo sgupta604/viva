@@ -47,10 +47,10 @@ COPY --from=viewer-build /src/viewer/dist ./viewer/dist
 COPY docker/entrypoint.sh /app/docker/entrypoint.sh
 RUN chmod +x /app/docker/entrypoint.sh
 
-# Drop privileges for runtime.
-RUN useradd --system --uid 1001 --home-dir /app --shell /usr/sbin/nologin viva \
-    && chown -R viva:viva /app
-USER viva
+# Runs as root so the crawler can read any bind-mounted /target regardless of
+# host UID (Linux/WSL/Mac mounts all map ownership differently, and a fixed
+# non-root UID breaks on at least one of them). The container is ephemeral,
+# localhost-only, and serves static files — root is acceptable here.
 
 EXPOSE 5173
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
