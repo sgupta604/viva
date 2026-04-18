@@ -1,0 +1,27 @@
+# Viewer
+viewer/node_modules/
+viewer/dist/
+viewer/test-results/
+viewer/playwright-report/
+viewer/public/graph.json
+viewer/public/source/
+viewer/.vite/
+
+# Crawler
+crawler/.pytest_cache/
+crawler/dist/
+crawler/build/
+crawler/*.egg-info/
+crawler/src/*.egg-info/
+**/__pycache__/
+*.pyc
+
+# Pipeline working state
+.claude/active-work/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
