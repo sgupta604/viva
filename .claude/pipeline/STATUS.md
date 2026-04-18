@@ -6,10 +6,10 @@
 
 | Field | Value |
 |-------|-------|
-| Feature | v1-demo |
-| Phase | test-pass |
-| Next | `/finalize v1-demo` |
-| Branch | - |
+| Feature | — |
+| Phase | — |
+| Next | — |
+| Branch | — |
 
 ## Queue
 
@@ -21,7 +21,7 @@
 
 | Feature | Date | PR |
 |---------|------|----|
-| - | - | - |
+| v1-demo | 2026-04-18 | https://github.com/sgupta604/viva/compare/main...feat/v1-demo?expand=1 |
 
 ## Parked
 
