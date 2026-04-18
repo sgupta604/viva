@@ -16,8 +16,22 @@ crawler/src/*.egg-info/
 **/__pycache__/
 *.pyc
 
+# Viewer: TypeScript-emitted sidecar artifacts (tsc -b composite leftovers)
+viewer/*.tsbuildinfo
+viewer/playwright.config.js
+viewer/playwright.config.d.ts
+viewer/tailwind.config.js
+viewer/tailwind.config.d.ts
+viewer/vite.config.js
+viewer/vite.config.d.ts
+viewer/vitest.config.js
+viewer/vitest.config.d.ts
+
 # Pipeline working state
 .claude/active-work/
+
+# Claude Code local settings (tool permissions, not for VCS)
+.claude/settings.local.json
 
 # OS / editor
 .DS_Store
