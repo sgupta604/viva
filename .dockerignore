@@ -1,0 +1,45 @@
+# Keep build context small and deterministic.
+
+# VCS + editor
+.git
+.gitignore
+.gitattributes
+.vscode
+.idea
+
+# Pipeline working state
+.claude
+
+# Docs (not needed in image)
+docs
+*.md
+
+# Node / viewer build artifacts (viewer stage rebuilds these)
+node_modules
+viewer/node_modules
+viewer/dist
+viewer/test-results
+viewer/playwright-report
+viewer/*.tsbuildinfo
+viewer/public/graph.json
+viewer/public/source
+viewer/.vite
+viewer/e2e
+
+# Python / crawler dev artifacts
+crawler/.venv
+crawler/.pytest_cache
+crawler/dist
+crawler/build
+crawler/*.egg-info
+crawler/src/*.egg-info
+crawler/tests
+**/__pycache__
+**/*.pyc
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Screenshots / generated local files
+image.png

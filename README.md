@@ -2,6 +2,21 @@
 
 Claude Code development pipeline for **viva**, a local, offline config-codebase visualizer. Drop `CLAUDE.md` and `.claude/` into the repo root.
 
+## Using viva on your codebase
+
+viva crawls a config-heavy codebase (XML / YAML / JSON / INI) and serves an
+interactive viewer for the graph of files and cross-references. Offline,
+local-only, no telemetry. One command to run it against any codebase:
+
+```bash
+docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
+```
+
+Open <http://localhost:5173> in your browser.
+
+See [`docker/README.md`](docker/README.md) for Windows / PowerShell quoting,
+port remapping, crawler flag passthrough, and troubleshooting.
+
 ## Setup
 
 1. `CLAUDE.md` and `.claude/` live at the repo root

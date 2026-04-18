@@ -1,4 +1,6 @@
 * text=auto eol=lf
+*.sh text eol=lf
+docker/entrypoint.sh text eol=lf
 *.png binary
 *.jpg binary
 *.ico binary

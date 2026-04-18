@@ -18,7 +18,7 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
-    sourcemap: true,
+    sourcemap: process.env.VITE_SOURCEMAP !== "0",
     rollupOptions: {
       output: {
         manualChunks: (id) => {
