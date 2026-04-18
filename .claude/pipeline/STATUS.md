@@ -6,16 +6,14 @@
 
 | Field | Value |
 |-------|-------|
-| Feature | none — next feature queued: ghcr-publish (auto-publish runtime image to GitHub Container Registry so end users can `docker pull` without building) |
+| Feature | none — v1 + runtime + publish pipeline complete. USER ACTION REQUIRED: see `docs/RELEASE.md` Section 1 for first-publish manual step (flip GHCR package to Public or all docker pull calls return 403/404). |
 | Phase | - |
-| Next | `/research ghcr-publish` |
+| Next | merge feat/v1-demo → feat/runtime-image → feat/ghcr-publish in order, then flip GHCR visibility |
 | Branch | - |
 
 ## Queue
 
-| Feature | Priority | Notes |
-|---------|----------|-------|
-| ghcr-publish | high | GitHub Actions workflow to build and push runtime image to ghcr.io/sgupta604/viva on release tags. Runtime image is not useful to end users until it is pullable without a local build. |
+_(empty)_
 
 ## Completed
 
@@ -23,6 +21,7 @@
 |---------|------|----|
 | v1-demo | 2026-04-18 | https://github.com/sgupta604/viva/compare/main...feat/v1-demo?expand=1 |
 | runtime-image | 2026-04-18 | https://github.com/sgupta604/viva/compare/feat/v1-demo...feat/runtime-image?expand=1 |
+| ghcr-publish | 2026-04-18 | https://github.com/sgupta604/viva/compare/feat/runtime-image...feat/ghcr-publish?expand=1 |
 
 ## Parked
 

@@ -6,14 +6,27 @@ no `npm` — just Docker.
 
 ## Quickstart
 
-From the root of the codebase you want to explore:
+Pull the image once, then run it from the root of the codebase you want to
+explore:
 
 ```bash
+docker pull ghcr.io/sgupta604/viva
 docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
 ```
 
 Open <http://localhost:5173> in your browser. Press Ctrl-C (or `docker stop`)
 to exit.
+
+### Auto-update on every run
+
+Prefer to always pull the latest published image before running? Add
+`--pull=always`:
+
+```bash
+docker run --rm --pull=always -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
+```
+
+This refreshes the local image cache from `ghcr.io` on every invocation.
 
 ### Windows
 
@@ -101,20 +114,6 @@ proprietary codebases. Always keep it.
 
 ## Troubleshooting
 
-- **"Unable to find image ghcr.io/sgupta604/viva".** The image has not been
-  published yet, or your Docker CLI has not pulled it. Build locally from the
-  repo root instead:
-
-  ```bash
-  git clone https://github.com/sgupta604/viva.git
-  cd viva
-  docker build -t viva .
-  docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 viva
-  ```
-
-  (`$(pwd)` in the last line means "the codebase you want to explore", which
-  may or may not be the viva repo itself.)
-
 - **"Port is already allocated" / "bind: address already in use".** Remap the
   host port, e.g. `-p 8080:5173`, and open <http://localhost:8080>.
 
@@ -133,3 +132,35 @@ proprietary codebases. Always keep it.
 No telemetry. No phone-home. No update check. No CDN fetches (Monaco and
 fonts are bundled). No network listener beyond the local HTTP server on
 `5173`. No auto-browser-open (impossible cleanly across platforms).
+
+## Fallback: build locally
+
+If `docker pull ghcr.io/sgupta604/viva` fails with 403/404 (package not yet
+published, or not yet made public), or you want to build from source, clone
+the repo and build the image locally:
+
+```bash
+git clone https://github.com/sgupta604/viva.git
+cd viva
+docker build -t viva .
+docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 viva
+```
+
+(`$(pwd)` in the last line means "the codebase you want to explore", which
+may or may not be the viva repo itself.)
+
+### Windows (fallback)
+
+PowerShell:
+
+```powershell
+docker run --rm -v "${PWD}:/target:ro" -p 5173:5173 viva
+```
+
+cmd.exe:
+
+```cmd
+docker run --rm -v "%cd%:/target:ro" -p 5173:5173 viva
+```
+
+Git Bash / WSL: use the bash command above.
