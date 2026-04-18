@@ -7,15 +7,6 @@ viewer/public/graph.json
 viewer/public/source/
 viewer/.vite/
 
-# Crawler
-crawler/.pytest_cache/
-crawler/dist/
-crawler/build/
-crawler/*.egg-info/
-crawler/src/*.egg-info/
-**/__pycache__/
-*.pyc
-
 # Viewer: TypeScript-emitted sidecar artifacts (tsc -b composite leftovers)
 viewer/*.tsbuildinfo
 viewer/playwright.config.js
@@ -26,6 +17,15 @@ viewer/vite.config.js
 viewer/vite.config.d.ts
 viewer/vitest.config.js
 viewer/vitest.config.d.ts
+
+# Crawler
+crawler/.pytest_cache/
+crawler/dist/
+crawler/build/
+crawler/*.egg-info/
+crawler/src/*.egg-info/
+**/__pycache__/
+*.pyc
 
 # Pipeline working state
 .claude/active-work/

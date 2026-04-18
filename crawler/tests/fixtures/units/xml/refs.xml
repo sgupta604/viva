@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <include file="other.xml"/>
+  <ref id="a.b"/>
+  <import path="nested/thing.yaml"/>
+</root>

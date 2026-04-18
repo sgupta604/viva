@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ingestion>
+  <ref id="radar.threshold_rain"/>
+  <import path="../pipelines/main.yaml"/>
+  <param id="ingestion.batch_size" value="128"/>
+</ingestion>

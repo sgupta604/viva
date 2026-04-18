@@ -1,0 +1,12 @@
+defaults: &defaults
+  retries: 3
+  timeout_s: 30
+
+job_a:
+  <<: *defaults
+  name: job-a
+
+job_b:
+  <<: *defaults
+  name: job-b
+  retries: 5

@@ -1,0 +1,9 @@
+{
+  "radar": {
+    "gain": 1.0,
+    "channel": "C-band"
+  },
+  "ingestion": {
+    "batch_size": 128
+  }
+}

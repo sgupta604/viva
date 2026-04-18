@@ -1,0 +1,5 @@
+{
+  "env": "dev",
+  "$include": "../config/ingestion.xml",
+  "log_level": "debug"
+}
