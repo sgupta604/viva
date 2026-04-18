@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ghost>
+  <include file="../nonexistent/missing.xml"/>
+  <ref id="nothing.matches.this"/>
+</ghost>

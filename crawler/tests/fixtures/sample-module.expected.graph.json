@@ -1,0 +1,474 @@
+{
+  "edges": [
+    {
+      "kind": "include",
+      "source": "0791a5826a",
+      "target": "4012898dc0",
+      "unresolved": null
+    },
+    {
+      "kind": "include",
+      "source": "67e3e791a0",
+      "target": null,
+      "unresolved": "../nonexistent/missing.xml"
+    },
+    {
+      "kind": "ref",
+      "source": "67e3e791a0",
+      "target": null,
+      "unresolved": "nothing.matches.this"
+    },
+    {
+      "kind": "include",
+      "source": "871f03cc34",
+      "target": "9a1f9f334d",
+      "unresolved": null
+    },
+    {
+      "kind": "import",
+      "source": "aa9b318519",
+      "target": "0791a5826a",
+      "unresolved": null
+    },
+    {
+      "kind": "ref",
+      "source": "aa9b318519",
+      "target": null,
+      "unresolved": "ambiguous:radar.threshold_rain (2 matches)"
+    },
+    {
+      "kind": "include",
+      "source": "d1efb571e6",
+      "target": "aa9b318519",
+      "unresolved": null
+    }
+  ],
+  "files": [
+    {
+      "folder": "config",
+      "id": "5b29ae138c",
+      "isTest": false,
+      "kind": "xml",
+      "name": "broken.xml",
+      "params": [],
+      "parseError": "XMLSyntaxError: Opening and ending tag mismatch: unclosed line 3 and broken, line 5, column 10 (<string>, line 5)",
+      "path": "config/broken.xml",
+      "sizeBytes": 99
+    },
+    {
+      "folder": "config",
+      "id": "4f22226ced",
+      "isTest": false,
+      "kind": "xml",
+      "name": "encoding-latin1.xml",
+      "params": [
+        {
+          "key": "note",
+          "kind": "scalar",
+          "line": 3,
+          "value": "caf-e"
+        }
+      ],
+      "parseError": null,
+      "path": "config/encoding-latin1.xml",
+      "sizeBytes": 100
+    },
+    {
+      "folder": "config",
+      "id": "aa9b318519",
+      "isTest": false,
+      "kind": "xml",
+      "name": "ingestion.xml",
+      "params": [
+        {
+          "key": "ingestion.batch_size",
+          "kind": "scalar",
+          "line": 5,
+          "value": "128"
+        }
+      ],
+      "parseError": null,
+      "path": "config/ingestion.xml",
+      "sizeBytes": 190
+    },
+    {
+      "folder": "config",
+      "id": "871f03cc34",
+      "isTest": false,
+      "kind": "xml",
+      "name": "radar.xml",
+      "params": [
+        {
+          "key": "radar.channel",
+          "kind": "scalar",
+          "line": 6,
+          "value": "C-band"
+        },
+        {
+          "key": "radar.gain",
+          "kind": "scalar",
+          "line": 5,
+          "value": "1.0"
+        },
+        {
+          "key": "radar.threshold_rain",
+          "kind": "scalar",
+          "line": 4,
+          "value": "0.25"
+        }
+      ],
+      "parseError": null,
+      "path": "config/radar.xml",
+      "sizeBytes": 231
+    },
+    {
+      "folder": "dangling",
+      "id": "67e3e791a0",
+      "isTest": false,
+      "kind": "xml",
+      "name": "ghost-ref.xml",
+      "params": [],
+      "parseError": null,
+      "path": "dangling/ghost-ref.xml",
+      "sizeBytes": 138
+    },
+    {
+      "folder": "environments",
+      "id": "d1efb571e6",
+      "isTest": false,
+      "kind": "json",
+      "name": "dev.json",
+      "params": [
+        {
+          "key": "env",
+          "kind": "scalar",
+          "line": null,
+          "value": "dev"
+        },
+        {
+          "key": "log_level",
+          "kind": "scalar",
+          "line": null,
+          "value": "debug"
+        }
+      ],
+      "parseError": null,
+      "path": "environments/dev.json",
+      "sizeBytes": 84
+    },
+    {
+      "folder": "environments",
+      "id": "c7a17124c1",
+      "isTest": false,
+      "kind": "json",
+      "name": "prod.json",
+      "params": [
+        {
+          "key": "env",
+          "kind": "scalar",
+          "line": null,
+          "value": "prod"
+        },
+        {
+          "key": "log_level",
+          "kind": "scalar",
+          "line": null,
+          "value": "warn"
+        },
+        {
+          "key": "workers",
+          "kind": "scalar",
+          "line": null,
+          "value": "8"
+        }
+      ],
+      "parseError": null,
+      "path": "environments/prod.json",
+      "sizeBytes": 59
+    },
+    {
+      "folder": "pipelines",
+      "id": "c18e30ff08",
+      "isTest": false,
+      "kind": "yaml",
+      "name": "anchors.yaml",
+      "params": [
+        {
+          "key": "defaults.retries",
+          "kind": "scalar",
+          "line": null,
+          "value": "3"
+        },
+        {
+          "key": "defaults.timeout_s",
+          "kind": "scalar",
+          "line": null,
+          "value": "30"
+        },
+        {
+          "key": "job_a.name",
+          "kind": "scalar",
+          "line": null,
+          "value": "job-a"
+        },
+        {
+          "key": "job_a.retries",
+          "kind": "scalar",
+          "line": null,
+          "value": "3"
+        },
+        {
+          "key": "job_a.timeout_s",
+          "kind": "scalar",
+          "line": null,
+          "value": "30"
+        },
+        {
+          "key": "job_b.name",
+          "kind": "scalar",
+          "line": null,
+          "value": "job-b"
+        },
+        {
+          "key": "job_b.retries",
+          "kind": "scalar",
+          "line": null,
+          "value": "5"
+        },
+        {
+          "key": "job_b.timeout_s",
+          "kind": "scalar",
+          "line": null,
+          "value": "30"
+        }
+      ],
+      "parseError": null,
+      "path": "pipelines/anchors.yaml",
+      "sizeBytes": 138
+    },
+    {
+      "folder": "pipelines",
+      "id": "0791a5826a",
+      "isTest": false,
+      "kind": "yaml",
+      "name": "main.yaml",
+      "params": [
+        {
+          "key": "defaults",
+          "kind": "scalar",
+          "line": null,
+          "value": "!include ../shared/defaults.json"
+        },
+        {
+          "key": "name",
+          "kind": "scalar",
+          "line": null,
+          "value": "main-pipeline"
+        },
+        {
+          "key": "stages",
+          "kind": "list",
+          "line": null,
+          "value": "[{\"batch_size\": 128, \"name\": \"ingest\"}, {\"batch_size\": 64, \"name\": \"transform\"}]"
+        }
+      ],
+      "parseError": null,
+      "path": "pipelines/main.yaml",
+      "sizeBytes": 147
+    },
+    {
+      "folder": "pipelines",
+      "id": "da2e3cd57e",
+      "isTest": false,
+      "kind": "yaml",
+      "name": "secondary.yml",
+      "params": [
+        {
+          "key": "doc0.depends_on",
+          "kind": "scalar",
+          "line": null,
+          "value": "main-pipeline"
+        },
+        {
+          "key": "doc0.name",
+          "kind": "scalar",
+          "line": null,
+          "value": "secondary-pipeline-doc-a"
+        },
+        {
+          "key": "doc1.batch_size",
+          "kind": "scalar",
+          "line": null,
+          "value": "32"
+        },
+        {
+          "key": "doc1.name",
+          "kind": "scalar",
+          "line": null,
+          "value": "secondary-pipeline-doc-b"
+        }
+      ],
+      "parseError": null,
+      "path": "pipelines/secondary.yml",
+      "sizeBytes": 111
+    },
+    {
+      "folder": "shared",
+      "id": "9a1f9f334d",
+      "isTest": false,
+      "kind": "xml",
+      "name": "common.xml",
+      "params": [
+        {
+          "key": "common.site",
+          "kind": "scalar",
+          "line": 3,
+          "value": "alpha"
+        },
+        {
+          "key": "common.version",
+          "kind": "scalar",
+          "line": 4,
+          "value": "1.0.0"
+        }
+      ],
+      "parseError": null,
+      "path": "shared/common.xml",
+      "sizeBytes": 145
+    },
+    {
+      "folder": "shared",
+      "id": "4012898dc0",
+      "isTest": false,
+      "kind": "json",
+      "name": "defaults.json",
+      "params": [
+        {
+          "key": "ingestion.batch_size",
+          "kind": "scalar",
+          "line": null,
+          "value": "128"
+        },
+        {
+          "key": "radar.channel",
+          "kind": "scalar",
+          "line": null,
+          "value": "C-band"
+        },
+        {
+          "key": "radar.gain",
+          "kind": "scalar",
+          "line": null,
+          "value": "1.0"
+        }
+      ],
+      "parseError": null,
+      "path": "shared/defaults.json",
+      "sizeBytes": 106
+    },
+    {
+      "folder": "tests",
+      "id": "471ff263d6",
+      "isTest": true,
+      "kind": "yaml",
+      "name": "test_helpers.yaml",
+      "params": [
+        {
+          "key": "helpers",
+          "kind": "list",
+          "line": null,
+          "value": "[\"mock_radar\", \"mock_ingestion\"]"
+        },
+        {
+          "key": "timeout_s",
+          "kind": "scalar",
+          "line": null,
+          "value": "5"
+        }
+      ],
+      "parseError": null,
+      "path": "tests/test_helpers.yaml",
+      "sizeBytes": 56
+    },
+    {
+      "folder": "tests",
+      "id": "3600ae033d",
+      "isTest": true,
+      "kind": "xml",
+      "name": "test_radar.xml",
+      "params": [
+        {
+          "key": "test.radar.mock",
+          "kind": "scalar",
+          "line": 3,
+          "value": "true"
+        }
+      ],
+      "parseError": null,
+      "path": "tests/test_radar.xml",
+      "sizeBytes": 99
+    },
+    {
+      "folder": "thresholds",
+      "id": "df38e08330",
+      "isTest": false,
+      "kind": "ini",
+      "name": "rain.ini",
+      "params": [
+        {
+          "key": "ingestion.max_retries",
+          "kind": "scalar",
+          "line": null,
+          "value": "3"
+        },
+        {
+          "key": "radar.threshold_rain",
+          "kind": "scalar",
+          "line": null,
+          "value": "0.25"
+        },
+        {
+          "key": "radar.threshold_snow",
+          "kind": "scalar",
+          "line": null,
+          "value": "0.40"
+        }
+      ],
+      "parseError": null,
+      "path": "thresholds/rain.ini",
+      "sizeBytes": 75
+    },
+    {
+      "folder": "thresholds",
+      "id": "b8b434c85a",
+      "isTest": false,
+      "kind": "ini",
+      "name": "wind.cfg",
+      "params": [
+        {
+          "key": "Wind.Direction",
+          "kind": "scalar",
+          "line": null,
+          "value": "NE"
+        },
+        {
+          "key": "Wind.MaxSpeed",
+          "kind": "scalar",
+          "line": null,
+          "value": "120"
+        },
+        {
+          "key": "Wind.minSpeed",
+          "kind": "scalar",
+          "line": null,
+          "value": "5"
+        }
+      ],
+      "parseError": null,
+      "path": "thresholds/wind.cfg",
+      "sizeBytes": 44
+    }
+  ],
+  "root": "sample-module",
+  "version": 1
+}

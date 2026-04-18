@@ -1,0 +1,6 @@
+---
+name: secondary-pipeline-doc-a
+depends_on: main-pipeline
+---
+name: secondary-pipeline-doc-b
+batch_size: 32

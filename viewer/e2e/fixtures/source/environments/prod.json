@@ -1,0 +1,5 @@
+{
+  "env": "prod",
+  "log_level": "warn",
+  "workers": 8
+}

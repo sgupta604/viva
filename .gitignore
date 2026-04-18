@@ -7,6 +7,17 @@ viewer/public/graph.json
 viewer/public/source/
 viewer/.vite/
 
+# Viewer: TypeScript-emitted sidecar artifacts (tsc -b composite leftovers)
+viewer/*.tsbuildinfo
+viewer/playwright.config.js
+viewer/playwright.config.d.ts
+viewer/tailwind.config.js
+viewer/tailwind.config.d.ts
+viewer/vite.config.js
+viewer/vite.config.d.ts
+viewer/vitest.config.js
+viewer/vitest.config.d.ts
+
 # Crawler
 crawler/.pytest_cache/
 crawler/dist/

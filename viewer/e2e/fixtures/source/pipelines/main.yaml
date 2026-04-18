@@ -1,0 +1,7 @@
+name: main-pipeline
+defaults: !include ../shared/defaults.json
+stages:
+  - name: ingest
+    batch_size: 128
+  - name: transform
+    batch_size: 64
