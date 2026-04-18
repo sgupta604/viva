@@ -24,7 +24,9 @@ viewer/*.tsbuildinfo
 viewer/public/graph.json
 viewer/public/source
 viewer/.vite
-viewer/e2e
+# viewer/e2e is NOT excluded — src tests import ../../e2e/fixtures/graph.json
+# during `tsc --noEmit` in the build. The files don't land in the final image
+# (we only COPY dist/ from the builder stage), so including them is free.
 
 # Python / crawler dev artifacts
 crawler/.venv
