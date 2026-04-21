@@ -14,28 +14,52 @@ def crawl(
     exclude: Optional[list[str]] = None,
     no_timestamp: bool = False,
     use_default_excludes: bool = True,
+    jobs: int = 1,
 ) -> Graph:
     """Crawl `root` and return a Graph.
 
     See docs/GRAPH-SCHEMA.md for the output contract.
+
+    ``jobs`` controls parse-time concurrency via ``ThreadPoolExecutor``. The
+    default (1) is serial — identical behavior to the pre-jobs code path. Set
+    >1 to parallelize; lxml releases the GIL during parse so threads help
+    noticeably on large XML workloads. Output order is always deterministic
+    (files sorted by path) regardless of jobs — we collect-then-sort.
     """
-    # Implementation wired up in Stream C; see __main__.py and emit.py for
-    # the full pipeline (discovery -> parsers -> refs -> emit).
     from .discovery import discover
     from .parsers import parse_file
     from .refs import resolve_references
 
     root_path = Path(root).resolve()
+    discovered = list(
+        discover(
+            root_path,
+            include=include,
+            exclude=exclude,
+            use_default_excludes=use_default_excludes,
+        )
+    )
+
     files = []
-    for rel_path, abs_path in discover(
-        root_path,
-        include=include,
-        exclude=exclude,
-        use_default_excludes=use_default_excludes,
-    ):
-        node = parse_file(rel_path, abs_path)
-        if node is not None:
-            files.append(node)
+    if jobs <= 1:
+        for rel_path, abs_path in discovered:
+            node = parse_file(rel_path, abs_path)
+            if node is not None:
+                files.append(node)
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            # Submit in discovery order; collect and then sort by path so the
+            # output is deterministic regardless of completion order (TR8).
+            results = list(pool.map(lambda rp: parse_file(rp[0], rp[1]), discovered))
+        for node in results:
+            if node is not None:
+                files.append(node)
+
+    # Deterministic file ordering: sort by path. Matches Graph.to_dict() but
+    # doing it here means `files` in the returned Graph is already stable,
+    # which the parallel-determinism test relies on.
+    files.sort(key=lambda f: f.path)
 
     edges = resolve_references(files)
     return Graph(

@@ -93,3 +93,21 @@ def test_ambiguous_global_id():
     u_edges = [e for e in edges if e.source == "u"]
     assert u_edges[0].target is None
     assert u_edges[0].unresolved and u_edges[0].unresolved.startswith("ambiguous:")
+
+
+def test_local_id_lookup_hash_indexed():
+    """Local-id behavior unchanged after the O(1) hash-index refactor.
+
+    Construct a file with 50 params and a raw ref to one of them; the edge
+    should resolve to self (same behavior as the pre-refactor linear probe).
+    """
+    params = [ParamNode(f"p{i}", str(i), "scalar", None) for i in range(50)]
+    src = _file("s", "lots.xml", params=params, raw_refs=[RawRef(kind="ref", raw="p42")])
+    edges = resolve_references([src])
+    assert len(edges) == 1
+    assert edges[0].source == "s"
+    assert edges[0].target == "s", (
+        "local-id ref must resolve to the declaring file (self) — "
+        "hash-index refactor must preserve this."
+    )
+    assert edges[0].unresolved is None

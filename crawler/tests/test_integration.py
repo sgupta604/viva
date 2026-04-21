@@ -97,3 +97,19 @@ def test_paths_are_posix_on_windows(sample_module: Path):
     for f in g.files:
         assert "\\" not in f.path, f"Windows-style path leaked into graph.json: {f.path}"
         assert "\\" not in f.folder
+
+
+@pytest.mark.integration
+def test_parallel_parse_determinism(sample_module: Path):
+    """jobs=1 and jobs=4 must produce identical graph output (TR8).
+
+    Parallel execution uses ThreadPoolExecutor; completion order is
+    non-deterministic, so the pipeline collects-then-sorts by path before
+    returning. This test locks that invariant so a future change to the
+    parallel path can't silently reorder files or edges.
+    """
+    g_serial = crawl(sample_module, no_timestamp=True, jobs=1)
+    g_parallel = crawl(sample_module, no_timestamp=True, jobs=4)
+    assert to_json(g_serial) == to_json(g_parallel), (
+        "serial and parallel crawls must produce byte-identical graph.json"
+    )

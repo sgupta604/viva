@@ -21,14 +21,20 @@ from .graph import Edge, FileNode
 def resolve_references(files: list[FileNode]) -> list[Edge]:
     by_path: dict[str, FileNode] = {f.path: f for f in files}
     by_param_key: dict[str, list[FileNode]] = {}
+    # Pre-build the set of param keys per source file so the local-id probe is
+    # O(1) per ref instead of O(params) — the original `any(p.key == raw …)`
+    # was the hot loop at viva's dogfood scale.
+    local_keys_by_file: dict[str, set[str]] = {}
     for f in files:
+        local_keys_by_file[f.id] = {p.key for p in f.params}
         for p in f.params:
             by_param_key.setdefault(p.key, []).append(f)
 
     edges: list[Edge] = []
     for src in files:
+        src_local_keys = local_keys_by_file[src.id]
         for raw in src.raw_refs:
-            resolved = _resolve_one(src, raw.raw, by_path, by_param_key)
+            resolved = _resolve_one(src, raw.raw, by_path, by_param_key, src_local_keys)
             if resolved is None:
                 edges.append(Edge(source=src.id, target=None, kind=raw.kind, unresolved=raw.raw))
             elif isinstance(resolved, str) and resolved.startswith("ambiguous:"):
@@ -43,6 +49,7 @@ def _resolve_one(
     raw: str,
     by_path: dict[str, FileNode],
     by_param_key: dict[str, list[FileNode]],
+    src_local_keys: set[str],
 ):
     # 1. Path-based resolution
     if _looks_like_path(raw):
@@ -53,8 +60,8 @@ def _resolve_one(
         # Path-ish but not found — return unresolved (not an id).
         return None
 
-    # 2. Local id
-    if any(p.key == raw for p in src.params):
+    # 2. Local id (O(1) set-lookup; replaces the prior linear `any(...)` probe).
+    if raw in src_local_keys:
         # Declared locally; still emit edge back to self so the reference is
         # traceable in the graph.
         return src

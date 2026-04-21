@@ -2,7 +2,11 @@
 
 Usage:
     python -m crawler <root> [--out PATH] [--include GLOB]... [--exclude GLOB]...
-                             [--no-timestamp] [--emit-sources] [-v]
+                             [--no-timestamp] [--no-emit-sources] [--jobs N] [-v]
+
+Source mirroring is ON by default (graph.json pairs with a sibling `source/`
+directory). Pass `--no-emit-sources` to suppress it on very large codebases
+where the mirrored tree is a disk-size concern.
 """
 from __future__ import annotations
 
@@ -44,8 +48,21 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Omit generatedAt from output for deterministic diffs.",
     )
     p.add_argument(
-        "--emit-sources", action="store_true",
-        help="Mirror source files into <out-dir>/source/ for the viewer Raw tab.",
+        "--emit-sources", action=argparse.BooleanOptionalAction, default=True,
+        help=(
+            "Mirror source files into <out-dir>/source/ for the viewer Raw tab "
+            "(default: on). Use --no-emit-sources to skip the mirror — recommended "
+            "for very large codebases where the sidecar's disk footprint is a concern."
+        ),
+    )
+    p.add_argument(
+        "--jobs", type=int, default=1,
+        help=(
+            "Parallel parse workers via ThreadPoolExecutor (default: 1, serial). "
+            "lxml releases the GIL during parse so threads help on big XML trees; "
+            "enable after measuring your workload — the default stays serial so "
+            "output ordering and error reporting are identical to prior versions."
+        ),
     )
     p.add_argument("-v", "--verbose", action="count", default=0)
     return p
@@ -61,12 +78,17 @@ def main(argv: list[str] | None = None) -> int:
         log.error("root is not a directory: %s", root)
         return 2
 
+    if args.jobs < 1:
+        log.error("--jobs must be >= 1, got %d", args.jobs)
+        return 2
+
     graph = crawl(
         root,
         include=args.include,
         exclude=args.exclude,
         no_timestamp=args.no_timestamp,
         use_default_excludes=not args.no_default_excludes,
+        jobs=args.jobs,
     )
     log.info(
         "crawled %s: %d files, %d edges (%d unresolved, %d parse errors)",
@@ -84,6 +106,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.emit_sources:
         mirror_sources(root, out_path, graph.files)
         log.info("mirrored sources to %s", out_path.parent / "source")
+    else:
+        log.info("--no-emit-sources: skipping source/ sidecar mirror")
     return 0
 
 
