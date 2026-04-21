@@ -8,6 +8,12 @@
     },
     {
       "kind": "include",
+      "source": "3bb919257a",
+      "target": "9a1f9f334d",
+      "unresolved": null
+    },
+    {
+      "kind": "include",
       "source": "67e3e791a0",
       "target": null,
       "unresolved": "../nonexistent/missing.xml"
@@ -21,6 +27,12 @@
     {
       "kind": "include",
       "source": "871f03cc34",
+      "target": "9a1f9f334d",
+      "unresolved": null
+    },
+    {
+      "kind": "include",
+      "source": "9de5937c64",
       "target": "9a1f9f334d",
       "unresolved": null
     },
@@ -50,8 +62,15 @@
       "isTest": false,
       "kind": "xml",
       "name": "broken.xml",
-      "params": [],
-      "parseError": "XMLSyntaxError: Opening and ending tag mismatch: unclosed line 3 and broken, line 5, column 10 (<string>, line 5)",
+      "params": [
+        {
+          "key": "x",
+          "kind": "scalar",
+          "line": 4,
+          "value": "y"
+        }
+      ],
+      "parseError": "XMLSyntaxError: Opening and ending tag mismatch: unclosed line 3 and broken (line 5)",
       "path": "config/broken.xml",
       "sizeBytes": 99
     },
@@ -72,6 +91,30 @@
       "parseError": null,
       "path": "config/encoding-latin1.xml",
       "sizeBytes": 100
+    },
+    {
+      "folder": "config",
+      "id": "9de5937c64",
+      "isTest": false,
+      "kind": "xml",
+      "name": "entity-decl.xml",
+      "params": [
+        {
+          "key": "config.uses.",
+          "kind": "scalar",
+          "line": 7,
+          "value": "&cfg;"
+        },
+        {
+          "key": "entity.sample_mode",
+          "kind": "scalar",
+          "line": 6,
+          "value": "entity-external"
+        }
+      ],
+      "parseError": null,
+      "path": "config/entity-decl.xml",
+      "sizeBytes": 230
     },
     {
       "folder": "config",
@@ -120,6 +163,24 @@
       "parseError": null,
       "path": "config/radar.xml",
       "sizeBytes": 231
+    },
+    {
+      "folder": "config",
+      "id": "3bb919257a",
+      "isTest": false,
+      "kind": "xml",
+      "name": "xi-include.xml",
+      "params": [
+        {
+          "key": "xi.sample_mode",
+          "kind": "scalar",
+          "line": 9,
+          "value": "undeclared-xi"
+        }
+      ],
+      "parseError": null,
+      "path": "config/xi-include.xml",
+      "sizeBytes": 505
     },
     {
       "folder": "dangling",

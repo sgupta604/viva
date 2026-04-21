@@ -28,13 +28,16 @@ def test_full_crawl_deterministic(sample_module: Path, tmp_path: Path):
 def test_expected_counts(sample_module: Path):
     """Lock the headline counts so regressions in parsing/resolution surface loudly."""
     g = crawl(sample_module, no_timestamp=True)
-    # 18 source files minus README.md and .hidden/ignored.xml = 16 parseable files
-    # .hidden was skipped by discovery (always); README.md skipped (unknown ext).
+    # 20 source files minus README.md and .hidden/ignored.xml = 18 parseable files
+    # (config/xi-include.xml and config/entity-decl.xml were added for the
+    # xml-viewer-hardening recover-mode coverage.)
     names = sorted(f.path for f in g.files)
     assert "config/broken.xml" in names
     assert "config/encoding-latin1.xml" in names
     assert "config/ingestion.xml" in names
     assert "config/radar.xml" in names
+    assert "config/xi-include.xml" in names
+    assert "config/entity-decl.xml" in names
     assert "shared/common.xml" in names
     assert "shared/defaults.json" in names
     assert "pipelines/main.yaml" in names
@@ -49,10 +52,20 @@ def test_expected_counts(sample_module: Path):
     assert "tests/test_helpers.yaml" in names
     assert ".hidden/ignored.xml" not in names
     assert "README.md" not in names
-    assert len(g.files) == 16
+    assert len(g.files) == 18
 
     parse_errors = [f for f in g.files if f.parse_error]
     assert len(parse_errors) == 1 and parse_errors[0].path == "config/broken.xml"
+
+    # xi-include.xml parses clean under recover mode even with the namespace
+    # declaration omitted — the regression this feature exists to fix.
+    xi = next(f for f in g.files if f.path == "config/xi-include.xml")
+    assert xi.parse_error is None
+    assert any(r.raw == "shared/common.xml" for r in xi.raw_refs)
+
+    # entity-decl.xml surfaces its ENTITY SYSTEM target as a kind=include raw ref.
+    entity = next(f for f in g.files if f.path == "config/entity-decl.xml")
+    assert any(r.kind == "include" and r.raw == "shared/common.xml" for r in entity.raw_refs)
 
     unresolved = [e for e in g.edges if e.target is None]
     # ghost-ref.xml has 2 raw refs (one include path, one ref id) both unresolved.
