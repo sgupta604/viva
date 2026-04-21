@@ -6,40 +6,42 @@ no `npm` — just Docker.
 
 ## Quickstart
 
-Pull the image once, then run it from the root of the codebase you want to
-explore:
-
-```bash
-docker pull ghcr.io/sgupta604/viva
-docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
-```
-
-Open <http://localhost:5173> in your browser. Press Ctrl-C (or `docker stop`)
-to exit.
-
-### Auto-update on every run
-
-Prefer to always pull the latest published image before running? Add
-`--pull=always`:
+Run it from the root of the codebase you want to explore:
 
 ```bash
 docker run --rm --pull=always -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
 ```
 
-This refreshes the local image cache from `ghcr.io` on every invocation.
+Open <http://localhost:5173> in your browser. Press Ctrl-C (or `docker stop`)
+to exit.
+
+`--pull=always` re-checks `ghcr.io` on every run and downloads only if the
+digest changed — usually a no-op, but it keeps you on the latest viva without
+having to remember to pull.
+
+### Skip the auto-update
+
+To use your locally cached image instead (fully offline, or pinned to whatever
+you already have), drop the `--pull=always` flag:
+
+```bash
+docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
+```
+
+Pull manually when you want updates: `docker pull ghcr.io/sgupta604/viva`.
 
 ### Windows
 
 PowerShell:
 
 ```powershell
-docker run --rm -v "${PWD}:/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
+docker run --rm --pull=always -v "${PWD}:/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
 ```
 
 cmd.exe:
 
 ```cmd
-docker run --rm -v "%cd%:/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
+docker run --rm --pull=always -v "%cd%:/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
 ```
 
 Git Bash / WSL: use the bash command above.
