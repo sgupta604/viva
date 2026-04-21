@@ -51,16 +51,16 @@ function FileNodeInner({ data, selected }: Props) {
       tabIndex={0}
       aria-label={`file ${f.path}`}
       data-testid={`node-${f.id}`}
-      className={`min-w-[160px] rounded-md border-2 ${KIND_COLOR[f.kind]} bg-neutral-900 px-3 py-2 text-left shadow-md transition ${ring}`}
+      className={`min-w-[200px] rounded-md border-2 ${KIND_COLOR[f.kind]} bg-neutral-900 px-3 py-2 text-left shadow-md transition ${ring}`}
     >
       <Handle type="target" position={Position.Left} className="!bg-neutral-500" />
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate font-mono text-sm text-neutral-100">{f.name}</div>
+        <div className="truncate font-mono text-base text-neutral-100">{f.name}</div>
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${KIND_BADGE[f.kind]}`}>
           {f.kind}
         </span>
       </div>
-      <div className="truncate text-[11px] text-neutral-500">{f.folder || "/"}</div>
+      <div className="truncate text-xs text-neutral-500">{f.folder || "/"}</div>
       {f.parseError && (
         <div className="mt-1 truncate text-[10px] text-red-400" title={f.parseError}>
           parse error

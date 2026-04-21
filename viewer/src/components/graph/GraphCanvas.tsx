@@ -80,6 +80,7 @@ export function GraphCanvas() {
         onNodeClick={(_e, node) => selectFile(node.id)}
         onPaneClick={() => selectFile(null)}
         fitView
+        minZoom={0.1}
         nodesConnectable={false}
         edgesUpdatable={false}
         proOptions={{ hideAttribution: true }}
