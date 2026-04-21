@@ -53,6 +53,15 @@ update in lockstep.
 | `parseError` | string \| null | yes | Null if parsed cleanly; human-readable error message otherwise. |
 | `isTest` | boolean | yes | True when path starts with `tests/` or contains a `/tests/` segment. Drives default "hide tests" filter. |
 
+### Partial-parse semantics
+
+When `parseError` is non-null, `params` and `raw_refs` MAY still be populated with
+content extracted by the recoverable parser. Consumers should render both: the
+error string informs the user that parsing was imperfect, while any recovered
+params and refs remain useful for navigation. There is no separate "partial"
+flag — the presence of a non-null `parseError` alongside populated arrays is
+the signal.
+
 ## ParamNode
 
 ```json
