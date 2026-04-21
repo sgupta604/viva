@@ -72,7 +72,7 @@ export function GraphCanvas() {
   if (!filtered || !layout) return null;
 
   return (
-    <div className="h-full w-full" data-testid="graph-canvas">
+    <div className="relative h-full w-full" data-testid="graph-canvas">
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -80,11 +80,29 @@ export function GraphCanvas() {
         onNodeClick={(_e, node) => selectFile(node.id)}
         onPaneClick={() => selectFile(null)}
         fitView
+        nodesConnectable={false}
+        edgesUpdatable={false}
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={16} color="#1f2937" />
         <Controls showInteractive={false} />
       </ReactFlow>
+      <div
+        data-testid="readonly-hint"
+        title="The graph reflects parsed code. Editing modes are not yet available."
+        className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-center gap-1.5 rounded-md border border-neutral-700 bg-neutral-900/80 px-2 py-1 font-mono text-[11px] text-neutral-400 shadow-sm backdrop-blur-sm"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          width="11"
+          height="11"
+          fill="currentColor"
+        >
+          <path d="M5 7V5a3 3 0 1 1 6 0v2h.5A1.5 1.5 0 0 1 13 8.5v4A1.5 1.5 0 0 1 11.5 14h-7A1.5 1.5 0 0 1 3 12.5v-4A1.5 1.5 0 0 1 4.5 7H5Zm1 0h4V5a2 2 0 1 0-4 0v2Z" />
+        </svg>
+        <span>Read-only view — graph reflects parsed code</span>
+      </div>
     </div>
   );
 }

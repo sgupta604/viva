@@ -31,14 +31,19 @@ const NODE_H = 64;
  */
 export function computeLayout(graph: Graph): LaidOutGraph {
   const g = new dagre.graphlib.Graph({ compound: true });
-  g.setGraph({ rankdir: "LR", nodesep: 30, ranksep: 80, marginx: 20, marginy: 20 });
+  // Compound mode underestimates parent-group sizing, so we use generous
+  // node/rank separation and explicit per-folder padding to keep child
+  // nodes from visually overlapping siblings or neighboring folders.
+  g.setGraph({ rankdir: "LR", nodesep: 80, ranksep: 160, marginx: 40, marginy: 40 });
   g.setDefaultEdgeLabel(() => ({}));
 
   const folders = Array.from(new Set(graph.files.map((f) => f.folder || ".")))
     .filter(Boolean)
     .sort();
   for (const folder of folders) {
-    g.setNode(`folder::${folder}`, { label: folder });
+    // dagre supports `paddingX`/`paddingY` on compound parents; without these,
+    // the parent rect is too small and child nodes spill across the border.
+    g.setNode(`folder::${folder}`, { label: folder, paddingX: 24, paddingY: 32 });
   }
 
   const fileById = new Map<string, FileNode>();
