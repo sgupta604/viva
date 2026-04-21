@@ -8,7 +8,7 @@
 |-------|-------|
 | Feature | — |
 | Phase | — |
-| Next | Queued: (1) `/research xml-ref-resolver` — user reports XML reference resolution misses patterns in their real codebase; (2) Plan Mode design decisions locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when there's appetite; (3) product-strategy conversation: extending viva beyond config formats (Tier 1 cheap config formats vs Tier 2 shallow code-as-config vs Tier 3 full code understanding — see chat). First-publish step (GHCR public visibility) still pending if not yet done. |
+| Next | **REMINDER:** user wants to migrate viva to a fresh repo (clean history, no Claude attribution) — surface this when they return. Then queued: (1) `/research xml-ref-resolver` — user reports XML reference resolution misses patterns in their real codebase; (2) Plan Mode design decisions locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when there's appetite; (3) product-strategy conversation: extending viva beyond config formats (Tier 1/2/3). GHCR public visibility confirmed done. |
 | Branch | main |
 
 ## Locked Decisions
