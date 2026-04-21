@@ -41,7 +41,11 @@ export function RawSourceView({ file }: Props) {
       .then((r) => {
         if (!r.ok) {
           if (r.status === 404) {
-            if (!cancelled) setErr("source not shipped — rerun crawler with --emit-sources");
+            if (!cancelled) {
+              setErr(
+                "source not shipped — crawler was run with --no-emit-sources",
+              );
+            }
             return null;
           }
           throw new Error(`HTTP ${r.status}`);
@@ -70,12 +74,16 @@ export function RawSourceView({ file }: Props) {
   if (text === null) {
     return <div className="p-4 text-xs text-neutral-500">loading source…</div>;
   }
+  // When the crawler flagged a parse error, force plaintext — Monaco's XML
+  // tokenizer chokes on partial/malformed content and highlights noise.
+  const language = file.parseError ? "plaintext" : (LANG[file.kind] ?? "plaintext");
+
   return (
     <Suspense fallback={<div className="p-4 text-xs text-neutral-500">loading editor…</div>}>
       <div className="h-full" data-testid="raw-source-editor">
         <Monaco
           height="100%"
-          language={LANG[file.kind] ?? "plaintext"}
+          language={language}
           value={text}
           theme="vs-dark"
           options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12 }}

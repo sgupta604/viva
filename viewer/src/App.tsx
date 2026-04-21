@@ -3,9 +3,13 @@ import { loadGraph, type LoadResult } from "@/lib/graph/load";
 import { useGraphStore } from "@/lib/state/graph-store";
 import { useSelectionStore } from "@/lib/state/selection-store";
 import { useFilterStore } from "@/lib/state/filter-store";
+import { useViewStore } from "@/lib/state/view-store";
 import { GraphCanvas } from "@/components/graph/GraphCanvas";
 import { FileDetailPanel } from "@/components/panels/FileDetailPanel";
 import { FilterBar } from "@/components/filters/FilterBar";
+import { ViewModeBar } from "@/components/filters/ViewModeBar";
+import { FolderView } from "@/components/views/FolderView";
+import { TableView } from "@/components/views/TableView";
 import { SearchPalette } from "@/components/search/SearchPalette";
 
 export default function App() {
@@ -18,6 +22,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const clearSelection = useSelectionStore((s) => s.clear);
   const resetFilters = useFilterStore((s) => s.reset);
+  const viewMode = useViewStore((s) => s.viewMode);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +84,7 @@ export default function App() {
       </header>
 
       <FilterBar />
+      <ViewModeBar />
 
       <main className="relative flex-1 overflow-hidden">
         {status === "loading" && (
@@ -98,7 +104,9 @@ export default function App() {
             </p>
           </div>
         )}
-        {status === "ready" && <GraphCanvas />}
+        {status === "ready" && viewMode === "graph" && <GraphCanvas />}
+        {status === "ready" && viewMode === "folders" && <FolderView />}
+        {status === "ready" && viewMode === "table" && <TableView />}
       </main>
 
       <FileDetailPanel />

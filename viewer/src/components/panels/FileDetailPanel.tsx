@@ -31,7 +31,22 @@ export function FileDetailPanel() {
           <div className="truncate font-mono text-sm text-neutral-100">{file.name}</div>
           <div className="truncate text-xs text-neutral-500">{file.path}</div>
           {file.parseError && (
-            <div className="mt-1 text-xs text-red-400">parse error: {file.parseError}</div>
+            <div className="mt-1 text-xs text-red-400">
+              parse error: {file.parseError}
+              {tab === "params" && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={() => setTab("raw")}
+                    data-testid="view-raw-anyway"
+                    className="ml-1 text-blue-400 underline hover:text-blue-300"
+                  >
+                    view raw anyway
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
         <button
