@@ -5,20 +5,38 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Stage the committed e2e fixture as `viewer/public/graph.json` so `npm run
- * preview` serves it. Also mirror the sample-module sources into
- * `viewer/public/source/` so the Raw tab has something to render.
+ * Stage the committed e2e fixture as the graph.json that `vite preview` will
+ * serve. Vite preview serves `dist/`, so we copy the fixture into both
+ * `public/graph.json` (source of truth for fresh dev/build) AND
+ * `dist/graph.json` (what preview actually serves when dist already exists).
+ * The duplication keeps E2E honest regardless of whether the tester just ran
+ * `npm run build` or not.
+ *
+ * Also mirror the sample-module sources into `public/source/` AND
+ * `dist/source/` so the Raw tab has something to render under preview.
  */
 export default async function globalSetup() {
   const fixture = resolve(here, "fixtures/graph.json");
-  const outGraph = resolve(here, "../public/graph.json");
-  mkdirSync(dirname(outGraph), { recursive: true });
-  copyFileSync(fixture, outGraph);
+
+  for (const outGraph of [
+    resolve(here, "../public/graph.json"),
+    resolve(here, "../dist/graph.json"),
+  ]) {
+    // If dist doesn't exist yet, skip — preview will rebuild or fail loudly.
+    if (outGraph.includes("dist") && !existsSync(dirname(outGraph))) continue;
+    mkdirSync(dirname(outGraph), { recursive: true });
+    copyFileSync(fixture, outGraph);
+  }
 
   const sourceRoot = resolve(here, "../../crawler/tests/fixtures/sample-module");
-  const publicSource = resolve(here, "../public/source");
   if (existsSync(sourceRoot)) {
-    copyDir(sourceRoot, publicSource);
+    for (const dstSource of [
+      resolve(here, "../public/source"),
+      resolve(here, "../dist/source"),
+    ]) {
+      if (dstSource.includes("dist") && !existsSync(dirname(dstSource))) continue;
+      copyDir(sourceRoot, dstSource);
+    }
   }
 }
 
