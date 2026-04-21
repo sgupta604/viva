@@ -1,14 +1,14 @@
 # Pipeline Status
 
-**Updated:** 2026-04-20
+**Updated:** 2026-04-21
 
 ## Active
 
 | Field | Value |
 |-------|-------|
-| Feature | quickfix in flight: node-overlap + read-only hint (viewer/) |
-| Phase | implement (general-purpose agent) |
-| Next | After quickfix lands → discuss remaining bugs from user's design doc. Plan Mode is the next big feature (`/research plan-mode`) — design decisions already locked in `.claude/docs/DECISIONS.md`. First-publish step (GHCR public visibility) still pending if not yet done. |
+| Feature | — |
+| Phase | — |
+| Next | Queued: (1) `/research xml-ref-resolver` — user reports XML reference resolution misses patterns in their real codebase; (2) Plan Mode design decisions locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when there's appetite; (3) product-strategy conversation: extending viva beyond config formats (Tier 1 cheap config formats vs Tier 2 shallow code-as-config vs Tier 3 full code understanding — see chat). First-publish step (GHCR public visibility) still pending if not yet done. |
 | Branch | main |
 
 ## Locked Decisions
