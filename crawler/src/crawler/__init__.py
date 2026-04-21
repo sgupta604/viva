@@ -13,6 +13,7 @@ def crawl(
     include: Optional[list[str]] = None,
     exclude: Optional[list[str]] = None,
     no_timestamp: bool = False,
+    use_default_excludes: bool = True,
 ) -> Graph:
     """Crawl `root` and return a Graph.
 
@@ -26,7 +27,12 @@ def crawl(
 
     root_path = Path(root).resolve()
     files = []
-    for rel_path, abs_path in discover(root_path, include=include, exclude=exclude):
+    for rel_path, abs_path in discover(
+        root_path,
+        include=include,
+        exclude=exclude,
+        use_default_excludes=use_default_excludes,
+    ):
         node = parse_file(rel_path, abs_path)
         if node is not None:
             files.append(node)

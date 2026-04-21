@@ -30,7 +30,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--exclude", action="append", default=None,
-        help="Exclude glob (repeatable).",
+        help="Exclude glob (repeatable). Additive to default directory excludes.",
+    )
+    p.add_argument(
+        "--no-default-excludes", action="store_true",
+        help=(
+            "Do NOT prune common heavy directories (node_modules, dist, build, "
+            "__pycache__, target, venv, .venv, vendor) at walk-time."
+        ),
     )
     p.add_argument(
         "--no-timestamp", action="store_true",
@@ -59,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         include=args.include,
         exclude=args.exclude,
         no_timestamp=args.no_timestamp,
+        use_default_excludes=not args.no_default_excludes,
     )
     log.info(
         "crawled %s: %d files, %d edges (%d unresolved, %d parse errors)",
