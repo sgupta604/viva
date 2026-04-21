@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Real-world trap: XInclude used without the xmlns:xi declaration on any ancestor.
+  A strict lxml parser raises "Namespace prefix xi on include is not defined".
+  With recover=True the tag survives as the literal string "xi:include" and the
+  crawler must still capture its href attribute as a raw include reference.
+-->
+<config name="xi-include-fixture">
+  <param id="xi.sample_mode" value="undeclared-xi"/>
+  <xi:include href="shared/common.xml"/>
+</config>

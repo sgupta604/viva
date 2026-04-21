@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE config [
+  <!ENTITY cfg SYSTEM "shared/common.xml">
+]>
+<config name="entity-decl-fixture">
+  <param id="entity.sample_mode" value="entity-external"/>
+  <uses>&cfg;</uses>
+</config>
