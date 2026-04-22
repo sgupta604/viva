@@ -42,7 +42,17 @@ import {
 
 export interface LaidOutGraphNode {
   id: string;
-  kind: "cluster" | "file";
+  /**
+   * Discriminates how `GraphCanvas.tsx` should render this position.
+   *
+   * - `cluster` / `file`        — emitted by `computeClusterLayout`. React
+   *   Flow node types `cluster` and `file` (compound box + file card).
+   * - `treeFolder` / `treeFile` — emitted by `computeDendrogramLayout`. React
+   *   Flow node types `treeFolder` and `treeFile` (flat label cards). NEVER
+   *   emit `parentNode` for these; the dendrogram expresses parent/child via
+   *   drawn hierarchy edges, not containment boxes.
+   */
+  kind: "cluster" | "file" | "treeFolder" | "treeFile";
   x: number;
   y: number;
   width: number;
