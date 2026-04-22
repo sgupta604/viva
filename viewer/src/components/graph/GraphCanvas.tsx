@@ -148,11 +148,23 @@ export function GraphCanvas() {
           fontSize: 10,
           fill: "#d1d5db",
           fontWeight: 500,
+          // Subtle stroke-outline on the text so a glyph that peeks past
+          // the opaque background still reads cleanly against a cluster
+          // border underneath (polish for edge-label-over-cluster mud).
+          paintOrder: "stroke",
+          stroke: "#0a0a0a",
+          strokeWidth: 2,
+          strokeLinejoin: "round",
         },
         labelShowBg: true,
-        labelBgStyle: { fill: "#0a0a0a", fillOpacity: 0.95 },
-        labelBgPadding: [6, 3] as [number, number],
-        labelBgBorderRadius: 3,
+        // Opaque near-black background with generous padding + rounded
+        // corners so the label stands proud of whatever cluster border
+        // happens to sit underneath. Without this, a label like
+        // "logical-id ×2" can paint over a sibling cluster's corner and
+        // produce a visual smudge.
+        labelBgStyle: { fill: "#0a0a0a", fillOpacity: 1 },
+        labelBgPadding: [10, 6] as [number, number],
+        labelBgBorderRadius: 6,
       };
     });
   }, [layout]);
@@ -176,7 +188,13 @@ export function GraphCanvas() {
         }}
         onPaneClick={() => selectFile(null)}
         fitView
-        minZoom={0.05}
+        // minZoom raised from 0.05 — at 0.05 a 3k-file graph collapsed
+        // into a ~60×20 px smudge, which is useless. 0.2 keeps tops
+        // legible as tiles even at the deepest allowed zoom-out.
+        // maxZoom pinned to 2 so file-name labels stay readable without
+        // rendering gigantic, pixel-fuzzy nodes.
+        minZoom={0.2}
+        maxZoom={2}
         nodesConnectable={false}
         edgesUpdatable={false}
         proOptions={{ hideAttribution: true }}
