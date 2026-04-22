@@ -64,6 +64,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "output ordering and error reporting are identical to prior versions."
         ),
     )
+    p.add_argument(
+        "--logical-id-max-cardinality", type=int, default=20,
+        help=(
+            "Cap for logical-ID cross-file edges: skip IDs declared by more than "
+            "N files (default: 20). Risk #3 mitigation — prevents a single "
+            "high-cardinality ID from exploding the graph."
+        ),
+    )
     p.add_argument("-v", "--verbose", action="count", default=0)
     return p
 
@@ -110,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         no_timestamp=args.no_timestamp,
         use_default_excludes=not args.no_default_excludes,
         jobs=args.jobs,
+        logical_id_max_cardinality=args.logical_id_max_cardinality,
     )
     log.info(
         "crawled %s: %d files, %d edges (%d unresolved, %d parse errors)",
