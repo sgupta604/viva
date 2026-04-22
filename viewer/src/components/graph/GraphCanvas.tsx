@@ -92,6 +92,11 @@ export function GraphCanvas() {
   }, [filtered, expanded, graphLayout]);
 
   const [treeLayout, setTreeLayout] = useState<LaidOutClusterGraph | null>(null);
+  // Worker-error surface — when computeTreeLayout fails, show a dismissible
+  // banner so the user (and visual-review screenshots) can see something
+  // went wrong instead of staring at a blank canvas. Console.error stays as
+  // a breadcrumb for /diagnose. Cleared on every successful compute.
+  const [layoutError, setLayoutError] = useState<string | null>(null);
   useEffect(() => {
     if (!filtered || graphLayout !== "tree") {
       setTreeLayout(null);
@@ -100,14 +105,18 @@ export function GraphCanvas() {
     let stale = false;
     computeTreeLayout(filtered, expanded)
       .then((laid) => {
-        if (!stale) setTreeLayout(laid);
+        if (stale) return;
+        setTreeLayout(laid);
+        setLayoutError(null);
       })
       .catch((err: unknown) => {
         if (stale) return;
         // Don't blank the canvas on transient worker errors — keep the last
         // good layout. Surface to console so /diagnose has a breadcrumb.
+        const message = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console
         console.error("computeTreeLayout failed", err);
+        setLayoutError(message);
       });
     return () => {
       stale = true;
@@ -257,6 +266,16 @@ export function GraphCanvas() {
           />
           <span className="font-mono text-xs">Computing layout…</span>
         </div>
+        {layoutError ? (
+          <div
+            data-testid="layout-error"
+            role="alert"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-md border border-red-700 bg-red-950/95 px-3 py-2 font-mono text-xs text-red-200 shadow-lg"
+          >
+            <span className="font-semibold">Layout failed:</span>{" "}
+            <span className="font-normal">{layoutError}</span>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -268,6 +287,24 @@ export function GraphCanvas() {
       data-loading="false"
       data-zoom-mode={zoomMode}
     >
+      {layoutError ? (
+        <div
+          data-testid="layout-error"
+          role="alert"
+          className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-md border border-red-700 bg-red-950/95 px-3 py-2 font-mono text-xs text-red-200 shadow-lg"
+        >
+          <span className="font-semibold">Layout failed:</span>{" "}
+          <span className="font-normal">{layoutError}</span>
+          <button
+            type="button"
+            onClick={() => setLayoutError(null)}
+            className="ml-3 text-red-400 hover:text-red-200"
+            aria-label="Dismiss layout error"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
