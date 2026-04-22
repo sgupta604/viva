@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { expandConfig } from "./helpers";
+import { expandConfig, waitForGraphReady } from "./helpers";
 
 test("loads graph.json and renders cluster nodes at default", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible({ timeout: 10_000 });
+  await waitForGraphReady(page);
   // v2 default = top-level clusters rendered as tiles; no file nodes.
   const clusterCount = await page
     .locator("[data-testid^='cluster-']")
@@ -13,7 +13,7 @@ test("loads graph.json and renders cluster nodes at default", async ({ page }) =
 
 test("expanding a cluster renders file nodes", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible({ timeout: 10_000 });
+  await waitForGraphReady(page);
   await expandConfig(page);
   const nodeCount = await page.locator("[data-testid^='node-']").count();
   expect(nodeCount).toBeGreaterThan(0);

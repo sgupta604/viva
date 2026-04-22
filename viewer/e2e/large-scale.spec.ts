@@ -7,11 +7,12 @@
  *   - expand+zoom-in flips to detail
  */
 import { test, expect } from "@playwright/test";
+import { waitForGraphReady } from "./helpers";
 
 test.describe("Large-scale 3k-file fixture", () => {
   test("default-collapsed has ≤ 20 visible cluster nodes, zero file nodes", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     const clusterNodes = page.locator('[data-testid^="cluster-"]');

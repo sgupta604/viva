@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { expandConfig } from "./helpers";
+import { expandConfig, waitForGraphReady } from "./helpers";
 
 test("Escape closes both palette and panel", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await page.keyboard.press("Control+k");
   await expect(page.getByTestId("search-input")).toBeVisible();
   await page.keyboard.press("Escape");

@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { expandConfig } from "./helpers";
+import { expandConfig, waitForGraphReady } from "./helpers";
 
 test("clicking a file node opens the detail panel", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await expandConfig(page);
   const first = page.locator("[data-testid^='node-']").first();
   await first.click();
@@ -12,7 +12,7 @@ test("clicking a file node opens the detail panel", async ({ page }) => {
 
 test("Esc closes the detail panel", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await expandConfig(page);
   const first = page.locator("[data-testid^='node-']").first();
   await first.click();
@@ -23,7 +23,7 @@ test("Esc closes the detail panel", async ({ page }) => {
 
 test("Raw tab lazy-loads source or shows missing placeholder", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await expandConfig(page);
   const first = page.locator("[data-testid^='node-']").first();
   await first.click();

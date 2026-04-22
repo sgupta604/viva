@@ -6,6 +6,7 @@
  * HIDE, but operate on files within the currently-visible (expanded) set.
  */
 import { test, expect } from "@playwright/test";
+import { expandCluster, waitForGraphReady } from "./helpers";
 
 async function expandAllTopClusters(page: import("@playwright/test").Page) {
   // Top-level clusters in sample-module: config, dangling, environments,
@@ -20,14 +21,14 @@ async function expandAllTopClusters(page: import("@playwright/test").Page) {
     "thresholds",
   ]) {
     const sel = page.getByTestId(`cluster-${folder}`);
-    if (await sel.count()) await sel.click();
+    if (await sel.count()) await expandCluster(page, folder);
   }
   await page.waitForTimeout(300);
 }
 
 test("default load has all top-level folder clusters collapsed; zero file nodes visible", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await page.waitForTimeout(300);
   const fileNodes = page.locator("[data-testid^='node-']");
   // With default-collapsed and the sample-module fixture, zero file nodes.
@@ -36,8 +37,8 @@ test("default load has all top-level folder clusters collapsed; zero file nodes 
 
 test("expanding a cluster reveals its files", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
-  await page.getByTestId("cluster-config").click();
+  await waitForGraphReady(page);
+  await expandCluster(page, "config");
   await page.waitForTimeout(300);
   // config/ contains 4+ parseable xml files
   const fileNodes = page.locator("[data-testid^='node-']");
@@ -46,7 +47,7 @@ test("expanding a cluster reveals its files", async ({ page }) => {
 
 test("hide-tests is on by default; unchecking reveals test files once expanded", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await expect(page.getByTestId("filter-hide-tests")).toBeChecked();
   await expandAllTopClusters(page);
   const initial = await page.locator("[data-testid^='node-']").count();
@@ -58,7 +59,7 @@ test("hide-tests is on by default; unchecking reveals test files once expanded",
 
 test("unchecking a kind filter removes those nodes once visible", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await expandAllTopClusters(page);
   const beforeAll = await page.locator("[data-testid^='node-']").count();
   await page.getByTestId("filter-kind-json").uncheck();
@@ -69,7 +70,7 @@ test("unchecking a kind filter removes those nodes once visible", async ({ page 
 
 test("jump-to-folder NAVIGATES: sibling clusters remain in DOM (NAVIGATE not HIDE)", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await page.waitForTimeout(300);
   // Pick a specific folder — the dropdown option list comes from
   // graph.clusters
@@ -85,10 +86,10 @@ test("jump-to-folder NAVIGATES: sibling clusters remain in DOM (NAVIGATE not HID
 
 test("jump-to-folder '(all)' collapses everything back to top level", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("graph-canvas")).toBeVisible();
+  await waitForGraphReady(page);
   await page.waitForTimeout(300);
   // Expand something first
-  await page.getByTestId("cluster-config").click();
+  await expandCluster(page, "config");
   await page.waitForTimeout(200);
   await expect(page.getByTestId("cluster-config")).toHaveAttribute("data-expanded", "true");
   // Now choose "(all)" → collapseAll

@@ -88,11 +88,21 @@ test.describe("tree-layout default + toggle", () => {
   }) => {
     await gotoFresh(page);
     await expect(page.getByTestId("graph-canvas")).toBeVisible({ timeout: 10_000 });
+    // Wait for layout to actually finish before searching for cluster nodes
+    // — skeleton-state introduced post tree-layout-redesign satisfies the
+    // visibility check above before any nodes hit the DOM.
+    await expect(page.getByTestId("graph-canvas")).toHaveAttribute(
+      "data-loading",
+      "false",
+      { timeout: 10_000 },
+    );
 
     // Expand the first available cluster (the canvas auto-expands a single
-    // top-level root, but we still have descendants to toggle). Use the
-    // ClusterNode header which is responsible for hierarchyStore.expand.
-    const cluster = page.locator('[data-testid^="cluster-node-"]').first();
+    // top-level root, but we still have descendants to toggle). ClusterNode
+    // emits `data-testid="cluster-${cluster.path}"` and `data-cluster-path`,
+    // so target by that prefix (NOT `cluster-node-` which never existed —
+    // pre-existing test bug surfaced once the worker hang stopped masking it).
+    const cluster = page.locator('[data-testid^="cluster-"][data-cluster-path]').first();
     await expect(cluster).toBeVisible({ timeout: 10_000 });
     const clusterId = await cluster.getAttribute("data-cluster-path");
 
@@ -108,7 +118,7 @@ test.describe("tree-layout default + toggle", () => {
 
     if (clusterId) {
       const stillThere = page.locator(
-        `[data-testid="cluster-node-${clusterId}"]`,
+        `[data-testid="cluster-${clusterId}"]`,
       );
       await expect(stillThere.first()).toBeVisible();
     }
@@ -144,14 +154,28 @@ test.describe("edge legend visibility", () => {
   });
 
   test("legend collapses on click and remembers its state", async ({ page }) => {
-    await gotoFresh(page);
+    // NOTE: do NOT use `gotoFresh()` here — it installs an init script that
+    // clears localStorage on EVERY navigation including page.reload(), which
+    // would silently destroy the persistence we're trying to verify. Plain
+    // page.goto plus a one-shot localStorage.clear() before the test is the
+    // correct way to start "fresh but preserving across reload".
+    await page.goto("/");
+    await page.evaluate(() => {
+      try {
+        window.localStorage.clear();
+      } catch {
+        // ignore
+      }
+    });
+    await page.reload();
     await expect(page.getByTestId("edge-legend")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("edge-legend-list")).toBeVisible();
 
     await page.getByTestId("edge-legend-toggle").click();
     await expect(page.getByTestId("edge-legend-list")).toHaveCount(0);
 
-    // Reload — collapsed state from localStorage should survive.
+    // Reload — collapsed state from localStorage should survive (no init
+    // script clears it this time).
     await page.reload();
     await expect(page.getByTestId("edge-legend")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("edge-legend-list")).toHaveCount(0);

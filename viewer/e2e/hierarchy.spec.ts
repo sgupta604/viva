@@ -9,11 +9,12 @@
  *   - cross-cluster edge remains visible at overview zoom
  */
 import { test, expect } from "@playwright/test";
+import { waitForGraphReady } from "./helpers";
 
 test.describe("Hierarchy — cluster expand/collapse", () => {
   test("default-collapsed — top-level clusters visible, files hidden", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     // Give the canvas a beat to lay out and fit view
     await page.waitForTimeout(400);
 
@@ -28,7 +29,7 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
 
   test("click cluster header → children appear", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     // Expand top00 — synthetic fixture puts its `.d/` sibling file
@@ -44,7 +45,7 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
 
   test("keyboard Enter on cluster toggles expansion", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
     const top01 = page.getByTestId("cluster-top01");
     await top01.focus();
@@ -55,12 +56,12 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
 
   test("expansion persists across reload via sessionStorage", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
     await page.getByTestId("cluster-top02").click();
     await page.waitForTimeout(200);
     await page.reload();
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
     // After reload, top02 should still be expanded
     const top02 = page.getByTestId("cluster-top02");
@@ -76,7 +77,7 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
 test.describe("Nested-cluster rendering (Bug 1)", () => {
   test("expanded cluster reveals child sub-clusters in DOM", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     // Pre-expand count of children-of-top05 (by cluster-parent attribute).
@@ -99,7 +100,7 @@ test.describe("Nested-cluster rendering (Bug 1)", () => {
 
   test("multi-level descent: expand top → mid → leaf files", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     // Expand top03
@@ -128,7 +129,7 @@ test.describe("Nested-cluster rendering (Bug 1)", () => {
 test.describe("Edges render as SVG paths (Bug 3)", () => {
   test("expanded cluster with intra-cluster edges draws at least one path", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     // Before expand — only top-level clusters; all 3k-fixture edges retarget
@@ -171,7 +172,7 @@ test.describe("Post-finalize blocker fixes", () => {
     // containing many files — direct-only count would render "0", regression
     // signature of the original post-finalize user review.
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     const top = page.getByTestId("cluster-top00");
@@ -188,7 +189,7 @@ test.describe("Post-finalize blocker fixes", () => {
     page,
   }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
     // Drill: top00 → top00/mid00. `top00/mid00` becomes an expanded grandchild
@@ -229,7 +230,7 @@ test.describe("Post-finalize blocker fixes", () => {
 test.describe("Folder dropdown shifts viewport (Bug 2)", () => {
   test("selecting a deep folder expands ancestors AND shifts the viewport", async ({ page }) => {
     await page.goto("/?graph=large");
-    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await waitForGraphReady(page);
     await page.waitForTimeout(500);
 
     const viewport = page.locator(".react-flow__viewport").first();
