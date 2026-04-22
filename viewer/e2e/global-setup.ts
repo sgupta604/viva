@@ -55,6 +55,17 @@ export default async function globalSetup() {
   const largeDest = resolve(here, "fixtures/large/graph.json");
   mkdirSync(dirname(largeDest), { recursive: true });
   writeFileSync(largeDest, largeJson, "utf8");
+  // Also publish at /graph-large.json under public/ + dist/ so the viewer
+  // (running under vite preview) can load it via App.tsx's ?graph=large
+  // query-param dispatch.
+  for (const outPath of [
+    resolve(here, "../public/graph-large.json"),
+    resolve(here, "../dist/graph-large.json"),
+  ]) {
+    if (outPath.includes("dist") && !existsSync(dirname(outPath))) continue;
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, largeJson, "utf8");
+  }
 }
 
 function copyDir(from: string, to: string) {

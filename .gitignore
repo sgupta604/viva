@@ -4,6 +4,7 @@ viewer/dist/
 viewer/test-results/
 viewer/playwright-report/
 viewer/public/graph.json
+viewer/public/graph-large.json
 viewer/public/source/
 viewer/.vite/
 

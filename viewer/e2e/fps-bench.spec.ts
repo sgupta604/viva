@@ -17,8 +17,8 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("FPS bench — large-scale fixture", () => {
-  // TODO: enable after V.4
-  test.skip("p95 frame time < 33 ms on 3k-file fixture pan", async ({ page }) => {
+  // Enabled at I.1 (post-V.4). Gate: p95 frame time < 33 ms.
+  test("p95 frame time < 33 ms on 3k-file fixture pan", async ({ page }) => {
     // Stage the large fixture as the served graph.json. The bench loads from
     // /graph-large.json which global-setup.ts copies into dist/ alongside the
     // regular graph.json.
