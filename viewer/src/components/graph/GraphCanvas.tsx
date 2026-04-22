@@ -230,12 +230,42 @@ export function GraphCanvas() {
     });
   }, [layout, selectedFileId]);
 
-  if (!filtered || !layout) return null;
+  // Pre-layout state — render a stable skeleton instead of returning null.
+  // Two reasons:
+  //   1. UX: tree mode runs ELK off-main-thread and on a 3k-file fixture
+  //      mrtree can take >1s. A blank dark panel during that window looks
+  //      broken and was the visible symptom of the worker hang we just
+  //      fixed (diagnosis 2026-04-22).
+  //   2. Test stability: every E2E `getByTestId("graph-canvas")` selector
+  //      now resolves immediately on slow CI machines, so a slow ELK
+  //      compute can't masquerade as a hang.
+  if (!filtered || !layout) {
+    return (
+      <div
+        className="relative flex h-full w-full items-center justify-center"
+        data-testid="graph-canvas"
+        data-loading="true"
+        data-zoom-mode={zoomMode}
+        role="status"
+        aria-live="polite"
+        aria-label="Computing graph layout"
+      >
+        <div className="flex flex-col items-center gap-3 text-neutral-400">
+          <span
+            aria-hidden="true"
+            className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-neutral-700 border-t-neutral-300"
+          />
+          <span className="font-mono text-xs">Computing layout…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       className="relative h-full w-full"
       data-testid="graph-canvas"
+      data-loading="false"
       data-zoom-mode={zoomMode}
     >
       <ReactFlow
