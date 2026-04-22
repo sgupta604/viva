@@ -30,19 +30,19 @@ test("default load has all top-level folder clusters collapsed; zero file nodes 
   await page.goto("/");
   await waitForGraphReady(page);
   await page.waitForTimeout(300);
-  const fileNodes = page.locator("[data-testid^='node-']");
-  // With default-collapsed and the sample-module fixture, zero file nodes.
-  expect(await fileNodes.count()).toBe(0);
+  // Auto-retrying assertion: the async dendrogram layout needs to settle on
+  // a cold ELK worker before we sample the DOM, and a one-shot count() can
+  // race the worker round-trip on slow runners.
+  await expect(page.locator("[data-testid^='node-']")).toHaveCount(0);
 });
 
 test("expanding a cluster reveals its files", async ({ page }) => {
   await page.goto("/");
   await waitForGraphReady(page);
   await expandCluster(page, "config");
-  await page.waitForTimeout(300);
-  // config/ contains 4+ parseable xml files
-  const fileNodes = page.locator("[data-testid^='node-']");
-  expect(await fileNodes.count()).toBeGreaterThan(0);
+  // config/ contains 4+ parseable xml files — wait for at least one to land
+  // in the DOM rather than racing the async layout with a one-shot count().
+  await expect(page.locator("[data-testid^='node-']").first()).toBeVisible();
 });
 
 test("hide-tests is on by default; unchecking reveals test files once expanded", async ({ page }) => {
@@ -95,7 +95,8 @@ test("jump-to-folder '(all)' collapses everything back to top level", async ({ p
   // Now choose "(all)" → collapseAll
   await page.getByTestId("filter-folder").selectOption("");
   await page.waitForTimeout(300);
-  // Zero file nodes (everything collapsed)
-  const fileNodes = page.locator("[data-testid^='node-']");
-  expect(await fileNodes.count()).toBe(0);
+  // Zero file nodes (everything collapsed). Auto-retrying so the async
+  // dendrogram layout has time to settle on cold ELK workers — a one-shot
+  // `expect(await locator.count()).toBe(0)` raced the worker round-trip.
+  await expect(page.locator("[data-testid^='node-']")).toHaveCount(0);
 });
