@@ -85,11 +85,19 @@ export function GraphCanvas() {
         return {
           id: n.id,
           type: "cluster",
+          // Nested cluster nodes MUST declare parentNode, or React Flow
+          // interprets their cluster-layout-emitted positions (which are
+          // parent-relative) as absolute and every descendant overlaps its
+          // uncle clusters (BLOCKER 1 from post-finalize visual-verify).
+          parentNode: n.parent ?? undefined,
+          extent: n.parent ? ("parent" as const) : undefined,
           position: { x: n.x, y: n.y },
           data: {
             cluster: n.cluster!,
             expanded: n.expanded!,
-            childCount: n.childCount ?? 0,
+            // Badge shows TOTAL descendant file count (BLOCKER 2), falling
+            // back to direct childCount for graphs that predate the fix.
+            childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
           },
           style: { width: n.width, height: n.height },
           selectable: false,

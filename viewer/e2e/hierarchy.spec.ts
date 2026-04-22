@@ -151,6 +151,78 @@ test.describe("Edges render as SVG paths (Bug 3)", () => {
 });
 
 /**
+ * Post-finalize blocker fixes — catches the exact two regressions surfaced by
+ * visual-verify.md:
+ *
+ *   BLOCKER 1: expanded grandchild cluster bounding box collides with an
+ *              uncle cluster's bounding box (pixel overlap in the UI).
+ *   BLOCKER 2: parent cluster with no direct childFiles (only sub-clusters)
+ *              displays badge "0" instead of the total descendant file count.
+ *
+ * Exercised against the synthetic large fixture (`?graph=large`) since the
+ * committed e2e fixture is flat — only the generated 3k-file tree has the
+ * nested top→mid→leaf shape needed to reproduce BLOCKER 1 under Playwright.
+ */
+test.describe("Post-finalize blocker fixes", () => {
+  test("top cluster badge shows total descendant file count, not 0 (BLOCKER 2)", async ({
+    page,
+  }) => {
+    // Large fixture: each `topNN` has childFiles=[] but nested grandchildren
+    // containing many files — direct-only count would render "0", regression
+    // signature of the original post-finalize user review.
+    await page.goto("/?graph=large");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await page.waitForTimeout(400);
+
+    const top = page.getByTestId("cluster-top00");
+    await expect(top).toBeVisible();
+    const badgeText = await top.locator("span.shrink-0").first().textContent();
+    const n = Number.parseInt((badgeText ?? "").trim(), 10);
+    expect(
+      n,
+      `cluster-top00 badge should be a positive integer, got "${badgeText}"`,
+    ).toBeGreaterThan(20);
+  });
+
+  test("expanded grandchild cluster does NOT overlap its uncle clusters (BLOCKER 1)", async ({
+    page,
+  }) => {
+    await page.goto("/?graph=large");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await page.waitForTimeout(400);
+
+    // Drill: top00 → top00/mid00. `top00/mid00` becomes an expanded grandchild
+    // (mid-level cluster nested inside top00); `top01` is its top-level sibling.
+    // Before the fix, mid00's interior would spill past top00's right edge and
+    // overlap top01's rectangle.
+    await page.getByTestId("cluster-top00").click();
+    await page.waitForTimeout(300);
+    await page.getByTestId("cluster-top00/mid00").click();
+    await page.waitForTimeout(500);
+
+    const midBox = await page.getByTestId("cluster-top00/mid00").boundingBox();
+    const uncleBox = await page.getByTestId("cluster-top01").boundingBox();
+    expect(midBox).not.toBeNull();
+    expect(uncleBox).not.toBeNull();
+
+    // Rect intersection test — any overlap on both axes = pixel collision.
+    const overlaps =
+      !!midBox &&
+      !!uncleBox &&
+      !(
+        midBox.x + midBox.width <= uncleBox.x ||
+        uncleBox.x + uncleBox.width <= midBox.x ||
+        midBox.y + midBox.height <= uncleBox.y ||
+        uncleBox.y + uncleBox.height <= midBox.y
+      );
+    expect(
+      overlaps,
+      `top00/mid00 (${JSON.stringify(midBox)}) overlaps top01 (${JSON.stringify(uncleBox)})`,
+    ).toBe(false);
+  });
+});
+
+/**
  * Folder-dropdown navigation (Bug 2 fix) — selecting a deep folder must
  * actually shift the viewport, not silently fitView on the whole graph.
  */

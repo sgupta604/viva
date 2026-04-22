@@ -283,3 +283,237 @@ describe("computeClusterLayout — nested clusters (Bug 1)", () => {
     expect(laid.edges.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Heterogeneous-width sibling packing — regression fixture for BLOCKER 1
+ * discovered in the post-fix visual verify. When cluster `a` has one EXPANDED
+ * sub-cluster `a/wide` (which itself contains many collapsed grand-children,
+ * making it much wider than a single tile) and several COLLAPSED siblings
+ * `a/narrow0`, `a/narrow1`, `a/narrow2`, packing the siblings in a row using a
+ * constant per-cell stride caused the collapsed siblings to land inside the
+ * bounding box of `a/wide` — pixel overlap in the UI.
+ *
+ * Expected: siblings placed AFTER `a/wide` in the same row must have x-coords
+ * ≥ (a/wide.x + a/wide.width), i.e. no horizontal overlap with the expanded
+ * sibling's full measured rectangle.
+ */
+function makeHeterogeneousSiblingFixture(): Graph {
+  const clusters = [
+    {
+      path: "a",
+      parent: null,
+      childFiles: [],
+      childClusters: [
+        "a/wide",
+        "a/narrow0",
+        "a/narrow1",
+        "a/narrow2",
+      ],
+      kind: "folder" as const,
+    },
+    {
+      path: "a/wide",
+      parent: "a",
+      childFiles: [],
+      // Seven grand-children, all collapsed — this forces a/wide's interior
+      // grid to wrap across multiple rows (SUBCLUSTERS_PER_ROW=3) and makes
+      // a/wide substantially wider than COLLAPSED_CLUSTER_W.
+      childClusters: [
+        "a/wide/g0",
+        "a/wide/g1",
+        "a/wide/g2",
+        "a/wide/g3",
+        "a/wide/g4",
+        "a/wide/g5",
+        "a/wide/g6",
+      ],
+      kind: "folder" as const,
+    },
+    ...["g0", "g1", "g2", "g3", "g4", "g5", "g6"].map((g) => ({
+      path: `a/wide/${g}`,
+      parent: "a/wide",
+      childFiles: [`${g}f`],
+      childClusters: [],
+      kind: "folder" as const,
+    })),
+    ...["narrow0", "narrow1", "narrow2"].map((n) => ({
+      path: `a/${n}`,
+      parent: "a",
+      childFiles: [`${n}f`],
+      childClusters: [],
+      kind: "folder" as const,
+    })),
+  ];
+  const mkFile = (id: string, folder: string) => ({
+    id,
+    path: `${folder}/${id}.xml`,
+    name: `${id}.xml`,
+    folder,
+    kind: "xml" as const,
+    sizeBytes: 100,
+    params: [],
+    parseError: null,
+    isTest: false,
+  });
+  const files = [
+    ...["g0", "g1", "g2", "g3", "g4", "g5", "g6"].map((g) =>
+      mkFile(`${g}f`, `a/wide/${g}`),
+    ),
+    ...["narrow0", "narrow1", "narrow2"].map((n) =>
+      mkFile(`${n}f`, `a/${n}`),
+    ),
+  ];
+  return { version: 2, root: "hetero", files, edges: [], clusters };
+}
+
+describe("computeClusterLayout — heterogeneous sibling packing (BLOCKER 1)", () => {
+  it("collapsed siblings do not horizontally overlap an expanded sibling's rect", () => {
+    const fx = makeHeterogeneousSiblingFixture();
+    // `a` and `a/wide` expanded; the three `a/narrowN` siblings stay collapsed.
+    const laid = computeClusterLayout(fx, new Set(["a", "a/wide"]));
+
+    const wide = laid.nodes.find((n) => n.id === "a/wide");
+    expect(wide).toBeDefined();
+    const narrows = ["a/narrow0", "a/narrow1", "a/narrow2"]
+      .map((id) => laid.nodes.find((n) => n.id === id))
+      .filter((n): n is NonNullable<typeof n> => !!n);
+    expect(narrows.length).toBe(3);
+
+    // All narrows are siblings of wide (parent === "a") and must be positioned
+    // outside wide's bounding box. Per-sibling x-coords are relative to `a`,
+    // so we compare against wide's own relative x + width.
+    for (const n of narrows) {
+      const horizontallyClear = n.x >= wide!.x + wide!.width;
+      const verticallyClear =
+        n.y >= wide!.y + wide!.height || n.y + n.height <= wide!.y;
+      expect(
+        horizontallyClear || verticallyClear,
+        `sibling ${n.id} at (${n.x},${n.y} ${n.width}x${n.height}) overlaps wide rect (${wide!.x},${wide!.y} ${wide!.width}x${wide!.height})`,
+      ).toBe(true);
+    }
+  });
+
+  it("parent cluster container is wide enough to contain its expanded child", () => {
+    const fx = makeHeterogeneousSiblingFixture();
+    const laid = computeClusterLayout(fx, new Set(["a", "a/wide"]));
+    const a = laid.nodes.find((n) => n.id === "a");
+    const wide = laid.nodes.find((n) => n.id === "a/wide");
+    expect(a).toBeDefined();
+    expect(wide).toBeDefined();
+    // wide's coords are relative to a; a's width must accommodate wide's
+    // full extent plus padding (descendants can't spill past a's right edge).
+    expect(a!.width).toBeGreaterThanOrEqual(wide!.x + wide!.width);
+  });
+});
+
+/**
+ * BLOCKER 2 regression: the badge on a collapsed cluster must show the TOTAL
+ * number of files in its subtree (all descendants), not just its direct
+ * childFiles. Pre-fix: `crawler` has childFiles=[] but 40+ files in descendant
+ * fixtures → badge read "0".
+ */
+function makeDescendantCountFixture(): Graph {
+  const clusters = [
+    {
+      path: "r",
+      parent: null,
+      childFiles: ["r-direct"],
+      childClusters: ["r/a", "r/b"],
+      kind: "folder" as const,
+    },
+    {
+      path: "r/a",
+      parent: "r",
+      childFiles: ["a-f0", "a-f1"],
+      childClusters: ["r/a/deep"],
+      kind: "folder" as const,
+    },
+    {
+      path: "r/a/deep",
+      parent: "r/a",
+      childFiles: ["deep-f0", "deep-f1", "deep-f2"],
+      childClusters: [],
+      kind: "folder" as const,
+    },
+    {
+      path: "r/b",
+      parent: "r",
+      childFiles: [], // intentionally empty — direct count 0, descendant ≠ 0
+      childClusters: ["r/b/leaf"],
+      kind: "folder" as const,
+    },
+    {
+      path: "r/b/leaf",
+      parent: "r/b",
+      childFiles: ["leaf-f0", "leaf-f1", "leaf-f2", "leaf-f3"],
+      childClusters: [],
+      kind: "folder" as const,
+    },
+  ];
+  const mkFile = (id: string, folder: string) => ({
+    id,
+    path: `${folder}/${id}.xml`,
+    name: `${id}.xml`,
+    folder,
+    kind: "xml" as const,
+    sizeBytes: 100,
+    params: [],
+    parseError: null,
+    isTest: false,
+  });
+  const files = [
+    mkFile("r-direct", "r"),
+    mkFile("a-f0", "r/a"),
+    mkFile("a-f1", "r/a"),
+    mkFile("deep-f0", "r/a/deep"),
+    mkFile("deep-f1", "r/a/deep"),
+    mkFile("deep-f2", "r/a/deep"),
+    mkFile("leaf-f0", "r/b/leaf"),
+    mkFile("leaf-f1", "r/b/leaf"),
+    mkFile("leaf-f2", "r/b/leaf"),
+    mkFile("leaf-f3", "r/b/leaf"),
+  ];
+  return { version: 2, root: "counts", files, edges: [], clusters };
+}
+
+describe("computeClusterLayout — totalDescendantFiles (BLOCKER 2)", () => {
+  it("root aggregates every file in its subtree", () => {
+    const laid = computeClusterLayout(makeDescendantCountFixture(), new Set());
+    const r = laid.nodes.find((n) => n.id === "r");
+    expect(r).toBeDefined();
+    // 1 direct + 2 under r/a + 3 under r/a/deep + 0 under r/b + 4 under r/b/leaf
+    expect(r!.totalDescendantFiles).toBe(10);
+  });
+
+  it("intermediate cluster with own direct files + deeper files aggregates both", () => {
+    const laid = computeClusterLayout(
+      makeDescendantCountFixture(),
+      new Set(["r"]),
+    );
+    const a = laid.nodes.find((n) => n.id === "r/a");
+    expect(a).toBeDefined();
+    // 2 direct + 3 under r/a/deep
+    expect(a!.totalDescendantFiles).toBe(5);
+  });
+
+  it("childFiles-empty cluster still reports descendant total (NOT 0)", () => {
+    const laid = computeClusterLayout(
+      makeDescendantCountFixture(),
+      new Set(["r"]),
+    );
+    const b = laid.nodes.find((n) => n.id === "r/b");
+    expect(b).toBeDefined();
+    // 0 direct + 4 under r/b/leaf — the viva-on-viva regression signature.
+    expect(b!.totalDescendantFiles).toBe(4);
+  });
+
+  it("leaf cluster's total equals its direct file count", () => {
+    const laid = computeClusterLayout(
+      makeDescendantCountFixture(),
+      new Set(["r", "r/b"]),
+    );
+    const leaf = laid.nodes.find((n) => n.id === "r/b/leaf");
+    expect(leaf).toBeDefined();
+    expect(leaf!.totalDescendantFiles).toBe(4);
+  });
+});

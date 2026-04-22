@@ -54,8 +54,15 @@ export interface LaidOutGraphNode {
   cluster?: ClusterNode;
   /** Collapsed/expanded flag for cluster nodes; file nodes always undefined. */
   expanded?: boolean;
-  /** Count of direct child files inside a cluster (for badge in ClusterNode header). */
+  /** Count of direct child files inside a cluster (retained for debugging / tests). */
   childCount?: number;
+  /**
+   * Total file count in this cluster's ENTIRE subtree (direct children +
+   * recursive descendants across every sub-cluster). THIS is what the
+   * ClusterNode badge displays — direct-only counts read misleadingly as `0`
+   * for parent clusters whose files live in nested sub-folders (BLOCKER 2).
+   */
+  totalDescendantFiles?: number;
 }
 
 /**
@@ -113,6 +120,11 @@ export function computeClusterLayout(
   // we walk the chain and pick the nearest ancestor currently visible.
   const fileToClusterChain = buildFileToClusterChain(graph, clusters, clustersByPath);
 
+  // BLOCKER 2 fix — precompute "files anywhere in subtree" for every cluster
+  // so the badge shows a meaningful number even when a cluster owns no direct
+  // files (e.g. `crawler` whose 40+ fixtures live under tests/fixtures/**).
+  const descendantCountByPath = buildDescendantFileCounts(clusters, clustersByPath);
+
   const nodes: LaidOutGraphNode[] = [];
 
   const topClusters = clusters
@@ -134,6 +146,7 @@ export function computeClusterLayout(
       clustersByPath,
       filesById,
       expanded,
+      descendantCountByPath,
     );
 
     // Wrap to next row if we've placed CLUSTERS_PER_ROW at this level.
@@ -157,6 +170,7 @@ export function computeClusterLayout(
       cluster,
       expanded: expanded.has(cluster.path),
       childCount: (cluster.childFiles ?? []).length,
+      totalDescendantFiles: descendantCountByPath.get(cluster.path) ?? 0,
     });
     // Descendants are already positioned relative to their immediate parent
     // cluster (React Flow compound-node convention), so we push them verbatim.
@@ -191,6 +205,7 @@ function layoutCluster(
   clustersByPath: Map<string, ClusterNode>,
   filesById: Map<string, FileNode>,
   expanded: Set<string>,
+  descendantCountByPath: Map<string, number>,
 ): { width: number; height: number; descendants: LaidOutGraphNode[] } {
   const isExpanded = expanded.has(cluster.path);
   if (!isExpanded) {
@@ -216,13 +231,14 @@ function layoutCluster(
   // ------------------------------------------------------------------
   // Sub-cluster row
   // ------------------------------------------------------------------
-  // Recurse first so we know each sub-cluster's laid-out dimensions, then
-  // pack them grid-style. We use row-major placement with variable row
-  // heights (matches how a real tiling algorithm handles heterogeneous
-  // children when expanded siblings may be much taller than collapsed ones).
+  // Recurse first so we know each sub-cluster's laid-out dimensions (the
+  // bottom-up MEASURE pass), then pack them in a grid using those measured
+  // sizes (the top-down PLACE pass). Row-major packing with variable row
+  // heights — heterogeneous siblings (one expanded + several collapsed) still
+  // land with stride = sibling's own measured width, so they never overlap.
   const subLayouts = childClusters.map((sub) => ({
     cluster: sub,
-    ...layoutCluster(sub, clustersByPath, filesById, expanded),
+    ...layoutCluster(sub, clustersByPath, filesById, expanded, descendantCountByPath),
   }));
 
   let subRowStartY = CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING;
@@ -253,11 +269,15 @@ function layoutCluster(
       cluster: sub.cluster,
       expanded: expanded.has(sub.cluster.path),
       childCount: (sub.cluster.childFiles ?? []).length,
+      totalDescendantFiles: descendantCountByPath.get(sub.cluster.path) ?? 0,
     });
     // sub.descendants are positioned relative to `sub.cluster`, so we can
     // emit them as-is (their `parent` already points at sub.cluster.path).
     for (const d of sub.descendants) descendants.push(d);
 
+    // Stride = this sibling's MEASURED width (not a constant tile size), so
+    // an expanded sibling pushes the next collapsed sibling past its right
+    // edge — no more pixel overlap (BLOCKER 1).
     subRowX += sub.width + INNER_COL_GAP;
     subRowHeight = Math.max(subRowHeight, sub.height);
     maxInnerRight = Math.max(maxInnerRight, subX + sub.width);
@@ -304,6 +324,47 @@ function layoutCluster(
   const height = filesBottom + CLUSTER_PADDING;
 
   return { width, height, descendants };
+}
+
+/**
+ * Total-subtree file count per cluster path. Bottom-up DFS — a cluster's total
+ * is its direct childFiles + the total of each sub-cluster. Cycles are
+ * tolerated (safety counter) even though the crawler emits a strict tree.
+ *
+ * The badge shown on every cluster reads from this map, not from
+ * `childFiles.length` alone. Direct count was the BLOCKER 2 symptom: a parent
+ * like `crawler` had childFiles=[] yet its subtree holds 40+ fixtures, so the
+ * UI rendered a misleading "0".
+ */
+function buildDescendantFileCounts(
+  clusters: ClusterNode[],
+  clustersByPath: Map<string, ClusterNode>,
+): Map<string, number> {
+  const cache = new Map<string, number>();
+  const visiting = new Set<string>();
+
+  const walk = (path: string): number => {
+    const cached = cache.get(path);
+    if (cached !== undefined) return cached;
+    if (visiting.has(path)) return 0; // cycle guard — defensive only
+    visiting.add(path);
+    const c = clustersByPath.get(path);
+    if (!c) {
+      visiting.delete(path);
+      cache.set(path, 0);
+      return 0;
+    }
+    let total = (c.childFiles ?? []).length;
+    for (const childPath of c.childClusters ?? []) {
+      total += walk(childPath);
+    }
+    visiting.delete(path);
+    cache.set(path, total);
+    return total;
+  };
+
+  for (const c of clusters) walk(c.path);
+  return cache;
 }
 
 /**
