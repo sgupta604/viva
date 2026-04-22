@@ -74,7 +74,15 @@ function ClusterNodeInner({ data }: ClusterNodeProps) {
         data-cluster-parent={cluster.parent ?? ""}
         onClick={onToggle}
         onKeyDown={onKey}
-        className={`h-full w-full cursor-pointer rounded-lg border-2 ${borderStyle} ${borderColor} bg-neutral-900/70 px-3 py-2 text-left transition hover:bg-neutral-900`}
+        // Background changed from `bg-neutral-900/70` (70% alpha) to opaque
+        // `bg-neutral-900` (user QA 2026-04-22). Translucent fill let
+        // hover-lit cross-ref edges bleed through the cluster card and
+        // visibly cut across the folder name + count badge in tree mode —
+        // the same image #14 root cause that was fixed for TreeFileNode but
+        // not for ClusterNode. Cluster cards already paint above the edge
+        // layer via React Flow's node z-index, so an opaque fill safely
+        // hides any edge passing behind them. No interaction change.
+        className={`h-full w-full cursor-pointer rounded-lg border-2 ${borderStyle} ${borderColor} bg-neutral-900 px-3 py-2 text-left transition hover:bg-neutral-800`}
       >
         <Handle
           type="target"
@@ -141,7 +149,13 @@ function ClusterNodeInner({ data }: ClusterNodeProps) {
         onClick={onToggle}
         onKeyDown={onKey}
         style={{ height: CLUSTER_HEADER_HEIGHT }}
-        className="flex cursor-pointer items-center gap-2 border-b border-neutral-800 bg-neutral-900/70 px-3"
+        // Header is opaque (was `bg-neutral-900/70`) for the same image #14
+        // reason as the collapsed branch above: cross-ref edges crossing the
+        // header strip would bleed through the translucent fill and cut
+        // through the folder name. Body keeps its translucent
+        // `bg-neutral-900/30` because children render INSIDE it — that's a
+        // legitimate soft-tint container, not a label-bearing surface.
+        className="flex cursor-pointer items-center gap-2 border-b border-neutral-800 bg-neutral-900 px-3"
       >
         <span aria-hidden="true" className="text-neutral-400">
           ▾

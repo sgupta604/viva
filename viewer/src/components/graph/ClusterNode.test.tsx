@@ -97,4 +97,36 @@ describe("ClusterNode", () => {
     expect(header.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText("▾")).toBeInTheDocument();
   });
+
+  // INVARIANT LOCK (image #14 fix, parity with TreeFileNode): cluster cards
+  // MUST use an opaque label-bearing surface so cross-ref edges passing
+  // behind them cannot bleed through and visually cut across the folder
+  // name + child-count badge. The edge SVG layer sits below the React Flow
+  // node layer in z-order, but a translucent fill defeats that protection.
+  it("collapsed card uses an opaque bg fill (no /alpha suffix)", () => {
+    const data = {
+      cluster: mkCluster("folder"),
+      expanded: false,
+      childCount: 3,
+    };
+    render(withProvider(<ClusterNode data={data} />));
+    const el = screen.getByTestId("cluster-a/b");
+    expect(el.className).toContain("bg-neutral-900");
+    // The opaque variant is `bg-neutral-900` exactly; the previously broken
+    // variant was `bg-neutral-900/70`. Reject any /alpha suffix so a future
+    // refactor can't silently regress.
+    expect(el.className).not.toMatch(/bg-neutral-900\/\d+/);
+  });
+
+  it("expanded header uses an opaque bg fill (no /alpha suffix)", () => {
+    const data = {
+      cluster: mkCluster("folder"),
+      expanded: true,
+      childCount: 3,
+    };
+    render(withProvider(<ClusterNode data={data} />));
+    const header = screen.getByRole("button");
+    expect(header.className).toContain("bg-neutral-900");
+    expect(header.className).not.toMatch(/bg-neutral-900\/\d+/);
+  });
 });
