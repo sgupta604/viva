@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { edgeStyleFor } from "./EdgeStyles";
+import { edgeStyleFor, EDGE_KIND_META } from "./EdgeStyles";
+import type { EdgeKind } from "@/lib/graph/types";
 
 describe("edgeStyleFor", () => {
   it("colors include blue, ref amber, import green (v1 unchanged)", () => {
@@ -38,6 +39,39 @@ describe("edgeStyleFor", () => {
       const s = edgeStyleFor(k, true);
       expect(s.stroke).toBe("#ef4444");
       expect(s.strokeDasharray).toBe("4 3");
+    }
+  });
+});
+
+describe("EDGE_KIND_META", () => {
+  it("contains every EdgeKind from the graph types union (no drift)", () => {
+    // If a new EdgeKind is added to lib/graph/types.ts, this exhaustive switch
+    // will fail to compile, surfacing the missing legend entry at build time.
+    const expected: EdgeKind[] = [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "d-aggregate",
+      "logical-id",
+    ];
+    const present = EDGE_KIND_META.map((m) => m.kind).sort();
+    expect(present).toEqual([...expected].sort());
+  });
+
+  it("every entry has a non-empty label", () => {
+    for (const meta of EDGE_KIND_META) {
+      expect(meta.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("colors match what edgeStyleFor returns for the same kind", () => {
+    for (const meta of EDGE_KIND_META) {
+      const style = edgeStyleFor(meta.kind, false);
+      expect(style.stroke).toBe(meta.color);
+      if (meta.dasharray) {
+        expect(style.strokeDasharray).toBe(meta.dasharray);
+      }
     }
   });
 });
