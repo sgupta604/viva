@@ -1,5 +1,80 @@
 {
-  "clusters": [],
+  "clusters": [
+    {
+      "childClusters": [],
+      "childFiles": [
+        "3bb919257a",
+        "4f22226ced",
+        "5b29ae138c",
+        "871f03cc34",
+        "9de5937c64",
+        "aa9b318519"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "config"
+    },
+    {
+      "childClusters": [],
+      "childFiles": [
+        "67e3e791a0"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "dangling"
+    },
+    {
+      "childClusters": [],
+      "childFiles": [
+        "c7a17124c1",
+        "d1efb571e6"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "environments"
+    },
+    {
+      "childClusters": [],
+      "childFiles": [
+        "0791a5826a",
+        "c18e30ff08",
+        "da2e3cd57e"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "pipelines"
+    },
+    {
+      "childClusters": [],
+      "childFiles": [
+        "4012898dc0",
+        "9a1f9f334d"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "shared"
+    },
+    {
+      "childClusters": [],
+      "childFiles": [
+        "3600ae033d",
+        "471ff263d6"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "tests"
+    },
+    {
+      "childClusters": [],
+      "childFiles": [
+        "b8b434c85a",
+        "df38e08330"
+      ],
+      "kind": "folder",
+      "parent": null,
+      "path": "thresholds"
+    }
+  ],
   "edges": [
     {
       "kind": "include",

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <description>Root config file foo.xml — has sibling .d/ for drop-ins</description>
+</root>

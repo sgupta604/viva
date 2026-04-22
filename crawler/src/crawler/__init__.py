@@ -26,6 +26,7 @@ def crawl(
     noticeably on large XML workloads. Output order is always deterministic
     (files sorted by path) regardless of jobs — we collect-then-sort.
     """
+    from .clusters import build_clusters, build_d_aggregate_edges
     from .discovery import discover
     from .parsers import parse_file
     from .refs import resolve_references
@@ -61,15 +62,17 @@ def crawl(
     # which the parallel-determinism test relies on.
     files.sort(key=lambda f: f.path)
 
+    # v2: build ClusterNode[] from file paths + pair `.d/` dirs with sibling
+    # files. Cluster build is pure; sidecar edges (d-aggregate) are merged with
+    # the ref-resolved edges below.
+    clusters = build_clusters(files)
     edges = resolve_references(files)
-    # clusters[] is populated in C.2 (clusters.py). Until then this foundation
-    # emission ships an empty clusters[] — the v2 shape is contract-complete
-    # but structurally a no-op on the viewer side (same cluster count as v1).
+    edges.extend(build_d_aggregate_edges(files, clusters))
     return Graph(
         root=root_path.name or str(root_path),
         files=files,
         edges=edges,
-        clusters=[],
+        clusters=clusters,
         generated_at=None if no_timestamp else _utc_now(),
     )
 
