@@ -126,3 +126,60 @@ def test_parallel_parse_determinism(sample_module: Path):
     assert to_json(g_serial) == to_json(g_parallel), (
         "serial and parallel crawls must produce byte-identical graph.json"
     )
+
+
+@pytest.mark.integration
+def test_emit_sources_no_self_feedback(tmp_path: Path):
+    """Two consecutive CLI crawls with --emit-sources and --out inside root
+    must not re-discover run 1's mirrored sources. Regression guard for the
+    sidecar feedback loop: without exclusion, run 2 picks up the files under
+    `out/source/` and nests them recursively (`source/source/...`).
+    """
+    # Build a tiny crawl target with --out inside the root (mirrors the
+    # real-world `python -m crawler . --out viewer/public/graph.json` setup).
+    root = tmp_path
+    (root / "config").mkdir()
+    (root / "config" / "a.xml").write_text('<root><a>1</a></root>\n', encoding="utf-8")
+    (root / "config" / "b.json").write_text('{"b": 2}\n', encoding="utf-8")
+    out_dir = root / "out"
+    out_dir.mkdir()
+    out_path = out_dir / "graph.json"
+
+    def _run() -> dict:
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "crawler", str(root),
+                "--out", str(out_path), "--no-timestamp",
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        return json.loads(out_path.read_text(encoding="utf-8"))
+
+    # Run 1 primes the state: writes out/graph.json + out/source/** mirror.
+    _run()
+    assert (out_dir / "source").is_dir(), "emit-sources should have written out/source/"
+
+    # Now crawl two more times. On each, discovery sees the state from the
+    # prior run. Without the fix, run 2 would pick up out/source/config/*.* as
+    # fresh files and run 3 would pick up out/source/out/source/... nested.
+    second = _run()
+    second_paths = sorted(f["path"] for f in second["files"])
+    third = _run()
+    third_paths = sorted(f["path"] for f in third["files"])
+
+    # The sidecar mirror must never leak back into graph.files. This is the
+    # concrete symptom of the feedback loop (paths like
+    # `out/source/config/a.xml`, or `out/source/out/source/...`).
+    for p in second_paths + third_paths:
+        assert "out/source" not in p, (
+            f"mirrored sidecar leaked back into graph.files: {p}"
+        )
+
+    # Back-to-back runs after priming must be byte-stable at the path level.
+    assert second_paths == third_paths, (
+        "two consecutive crawls with --emit-sources and --out inside root "
+        "must produce a stable file set; drift implies a feedback loop.\n"
+        f"  run 2: {second_paths}\n"
+        f"  run 3: {third_paths}"
+    )

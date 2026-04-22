@@ -82,10 +82,31 @@ def main(argv: list[str] | None = None) -> int:
         log.error("--jobs must be >= 1, got %d", args.jobs)
         return 2
 
+    out_path = Path(args.out)
+    # Guard against the --emit-sources self-feedback loop: when the mirror
+    # destination (<out>.parent/source) resolves inside the crawl root, the
+    # next run would re-discover last run's sidecar files and nest them
+    # recursively. Exclude the mirror dir from discovery to break the loop.
+    # Generalized: any exclude glob the user already passed is preserved.
+    exclude_globs = list(args.exclude) if args.exclude else []
+    if args.emit_sources:
+        mirror_dir = (out_path.resolve().parent / "source").resolve()
+        try:
+            rel = mirror_dir.relative_to(root)
+        except ValueError:
+            rel = None
+        if rel is not None:
+            rel_posix = rel.as_posix()
+            exclude_globs.extend([f"{rel_posix}/**", rel_posix])
+            log.info(
+                "excluding emit-sources output subtree from walk: %s",
+                rel_posix,
+            )
+
     graph = crawl(
         root,
         include=args.include,
-        exclude=args.exclude,
+        exclude=exclude_globs or None,
         no_timestamp=args.no_timestamp,
         use_default_excludes=not args.no_default_excludes,
         jobs=args.jobs,
@@ -99,7 +120,6 @@ def main(argv: list[str] | None = None) -> int:
         sum(1 for f in graph.files if f.parse_error),
     )
 
-    out_path = Path(args.out)
     write(graph, out_path)
     log.info("wrote %s", out_path)
 
