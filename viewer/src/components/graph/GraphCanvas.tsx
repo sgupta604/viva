@@ -26,6 +26,7 @@ import {
   edgeStyleFor,
   shouldDisablePointerEvents,
   treeEdgeStyleFor,
+  crossRefOpacityFor,
 } from "./EdgeStyles";
 import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
@@ -53,6 +54,8 @@ export function GraphCanvas() {
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const selectFile = useSelectionStore((s) => s.selectFile);
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
+  const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
+  const hoverNode = useSelectionStore((s) => s.hoverNode);
   const expanded = useHierarchyStore((s) => s.expanded);
   const expand = useHierarchyStore((s) => s.expand);
   const graphLayout = useViewStore((s) => s.graphLayout);
@@ -294,20 +297,49 @@ export function GraphCanvas() {
         e.kind,
         isFlatMode,
       );
+      // Focus + context dimming (user feedback 2026-04-22, post-images
+      // #13/#14): cross-ref edges in flat modes recede to ~15% opacity
+      // unless the hovered or selected node is one of their endpoints.
+      // Hierarchy edges and cluster mode are exempt — see crossRefOpacityFor
+      // for the per-mode rules. Computed per-edge inside this useMemo so a
+      // hover state change triggers ONE re-map (cheap; flat-mode edge counts
+      // are bounded by the visible-node fan-out).
+      //
+      // Selection counts as "focused" right alongside hover so that opening
+      // a file's detail panel keeps that file's connections lit even after
+      // the mouse moves away — matches the natural "I clicked this; show me
+      // its world" mental model.
+      const focusedNodeId = hoveredNodeId ?? selectedFileId;
+      const isFocused =
+        focusedNodeId !== null &&
+        (e.source === focusedNodeId || e.target === focusedNodeId);
+      const opacity = crossRefOpacityFor(e.kind, isFlatMode, isFocused);
+      // Bezier curves for cross-ref edges in flat modes (Change 2): the
+      // smoothstep orthogonal routing inherited from elkjs's mrtree was the
+      // visual culprit behind images #13/#14 — straight horizontal/vertical
+      // segments through sibling rows. Bezier curves arc away from the
+      // tree's main axes and naturally avoid passing through node bodies.
+      // Hierarchy edges KEEP smoothstep so the tree backbone stays crisp
+      // and rectilinear; cluster mode is unchanged.
+      const useBezier = isFlatMode && e.kind !== "d-aggregate";
       return {
         id: e.id,
         source: e.source,
         target: e.target,
-        type: "smoothstep",
+        type: useBezier ? "default" : "smoothstep",
         zIndex: 1000,
         style: {
           ...style,
           strokeWidth: isAggregated
             ? Math.min(6, 1.5 + Math.log2(e.count))
             : style.strokeWidth,
+          opacity,
           ...(isHierarchyInFlatMode ? { pointerEvents: "none" as const } : {}),
         },
-        markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: style.stroke,
+        },
         // ariaLabel renders as a native browser tooltip on the SVG path
         // (React Flow forwards it onto the edge group). Gives tree-mode
         // edges a hover-to-discover affordance without polluting the
@@ -351,7 +383,7 @@ export function GraphCanvas() {
         labelBgBorderRadius: 6,
       };
     });
-  }, [layout, selectedFileId, isFlatMode]);
+  }, [layout, selectedFileId, hoveredNodeId, isFlatMode]);
 
   // Pre-layout state — render a stable skeleton instead of returning null.
   // Two reasons:
@@ -429,7 +461,19 @@ export function GraphCanvas() {
           // nodes have their own toggle handlers.
           if (node.type === "file" || node.type === "treeFile") selectFile(node.id);
         }}
-        onPaneClick={() => selectFile(null)}
+        // Hover handlers drive the focus + context dimming of cross-ref
+        // edges. The store update is cheap (one Zustand set), and React
+        // Flow throttles its own mouse events, so we don't need to
+        // debounce here. Mouse-leave clears the hover so edges return to
+        // the dim default state. The onPaneClick handler also clears
+        // hover defensively in case the leave event was missed (e.g. the
+        // pointer left through a gap between two nodes the engine missed).
+        onNodeMouseEnter={(_e, node) => hoverNode(node.id)}
+        onNodeMouseLeave={() => hoverNode(null)}
+        onPaneClick={() => {
+          selectFile(null);
+          hoverNode(null);
+        }}
         fitView
         // minZoom raised from 0.05 — at 0.05 a 3k-file graph collapsed
         // into a ~60×20 px smudge, which is useless. 0.2 keeps tops

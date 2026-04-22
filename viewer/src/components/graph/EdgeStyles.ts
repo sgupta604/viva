@@ -139,6 +139,44 @@ export function shouldDisablePointerEvents(
 }
 
 /**
+ * Focus + context dimming for cross-reference edges in flat (dendrogram/tree)
+ * modes. User feedback 2026-04-22: in dense flat layouts, cross-ref edges
+ * criss-cross sibling nodes and the eye can't trace which connects to what.
+ *
+ * Default state (no focus): cross-ref edges render at 0.15 opacity so the
+ * dendrogram structure reads cleanly and references recede into a faint
+ * lattice of "there are connections here, hover to investigate."
+ *
+ * Focused state (hover OR selection on either endpoint): cross-ref edges
+ * touching the focused node return to full opacity so the user can trace
+ * what THIS node references and is referenced by.
+ *
+ * Hierarchy (`d-aggregate`) edges always render full opacity — they're the
+ * tree's backbone, dimming them would break the visual structure.
+ *
+ * Cluster mode is intentionally untouched (caller passes `isFlatMode=false`)
+ * because the user explicitly values cluster mode as the dense info-rich
+ * alternative; dimming there would erase information they want.
+ *
+ * Pure helper — same `(kind, isFlatMode, isFocused)` always returns the same
+ * opacity. Exported for the GraphCanvas edge mapper AND for tests.
+ */
+export const CROSSREF_DIM_OPACITY = 0.15;
+export const CROSSREF_FULL_OPACITY = 1;
+
+export function crossRefOpacityFor(
+  kind: EdgeKind,
+  isFlatMode: boolean,
+  isFocused: boolean,
+): number {
+  // Cluster mode: never dim. Hierarchy edges in any mode: never dim — the
+  // tree backbone needs to stay visible.
+  if (!isFlatMode) return CROSSREF_FULL_OPACITY;
+  if (kind === "d-aggregate") return CROSSREF_FULL_OPACITY;
+  return isFocused ? CROSSREF_FULL_OPACITY : CROSSREF_DIM_OPACITY;
+}
+
+/**
  * 2-row legend metadata for tree mode. Keeps the same `EdgeKindMeta` shape
  * the legend already iterates over (label + color + strokeWidth), so the
  * EdgeLegend component can switch arrays without restructuring its JSX.

@@ -8,6 +8,9 @@ import {
   TREE_HIERARCHY_COLOR,
   TREE_CROSSREF_COLOR,
   TREE_LEGEND_ROWS,
+  crossRefOpacityFor,
+  CROSSREF_DIM_OPACITY,
+  CROSSREF_FULL_OPACITY,
 } from "./EdgeStyles";
 import type { EdgeKind } from "@/lib/graph/types";
 
@@ -170,6 +173,57 @@ describe("shouldDisablePointerEvents (flat-mode hierarchy decoration)", () => {
       expect(shouldDisablePointerEvents(k, true)).toBe(false);
       expect(shouldDisablePointerEvents(k, false)).toBe(false);
     }
+  });
+});
+
+describe("crossRefOpacityFor (focus + context dimming)", () => {
+  // INVARIANT LOCK: in flat (dendrogram/tree) modes, cross-ref edges dim by
+  // default and light up when their endpoint is hovered/selected. Cluster
+  // mode is intentionally untouched (user values cluster info-density), and
+  // the d-aggregate hierarchy backbone never dims in any mode.
+  it("dims cross-ref kinds in flat mode when nothing is focused", () => {
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(crossRefOpacityFor(k, true, false)).toBe(CROSSREF_DIM_OPACITY);
+    }
+  });
+
+  it("returns full opacity for cross-ref kinds in flat mode when focused", () => {
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(crossRefOpacityFor(k, true, true)).toBe(CROSSREF_FULL_OPACITY);
+    }
+  });
+
+  it("never dims hierarchy (d-aggregate) edges, focused or not, in any mode", () => {
+    expect(crossRefOpacityFor("d-aggregate", true, false)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
+    expect(crossRefOpacityFor("d-aggregate", true, true)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
+    expect(crossRefOpacityFor("d-aggregate", false, false)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
+  });
+
+  it("never dims any kind in cluster mode (info-density preserved)", () => {
+    for (const k of [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "logical-id",
+      "d-aggregate",
+    ] as const) {
+      expect(crossRefOpacityFor(k, false, false)).toBe(CROSSREF_FULL_OPACITY);
+      expect(crossRefOpacityFor(k, false, true)).toBe(CROSSREF_FULL_OPACITY);
+    }
+  });
+
+  it("dim opacity is around 15% — visible enough to hint at structure, faint enough to recede", () => {
+    // Lock the literal so a future "make it darker / brighter" tweak is a
+    // single deliberate test edit, not a silent UX shift.
+    expect(CROSSREF_DIM_OPACITY).toBe(0.15);
+    expect(CROSSREF_FULL_OPACITY).toBe(1);
   });
 });
 
