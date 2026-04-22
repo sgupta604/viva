@@ -21,15 +21,24 @@ import {
   type LaidOutClusterGraph,
 } from "@/lib/graph/cluster-layout";
 import { computeTreeLayout } from "@/lib/graph/tree-layout";
+import { computeDendrogramLayout } from "@/lib/graph/dendrogram-layout";
 import { edgeStyleFor, treeEdgeStyleFor } from "./EdgeStyles";
 import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
 import ClusterNode from "./ClusterNode";
+import TreeFolderNode from "./TreeFolderNode";
+import TreeFileNode from "./TreeFileNode";
 import { zoomModeFor, type ZoomMode } from "./SemanticZoom";
 
+// React Flow node-type registry. `treeFolder` / `treeFile` are emitted by
+// computeDendrogramLayout; the existing `cluster` / `file` come from
+// computeClusterLayout. computeTreeLayout reuses `cluster` / `file` (its
+// nodes are still containment boxes, just laid out by mrtree).
 const nodeTypes = {
   file: FileNode,
   cluster: ClusterNode,
+  treeFolder: TreeFolderNode,
+  treeFile: TreeFileNode,
 };
 
 /** Inner component — must be rendered inside ReactFlowProvider (see App.tsx). */
@@ -80,33 +89,45 @@ export function GraphCanvas() {
     });
   }, [graph, kinds, hideTests, searchQuery]);
 
-  // Cluster mode is sync (recursive grid-pack on the main thread); tree mode
-  // is async (mrtree via the elkjs Web Worker, with main-thread fallback in
-  // jsdom). Both produce LaidOutClusterGraph — React Flow downstream is
-  // identical. Cluster mode preserves its synchronous render path so the
-  // existing cluster e2e + Vitest specs stay green.
+  // Cluster mode is sync (recursive grid-pack on the main thread); the two
+  // flat modes (dendrogram, tree) are async (ELK mrtree via the elkjs Web
+  // Worker, with main-thread fallback in jsdom). All three produce
+  // LaidOutClusterGraph — React Flow downstream branches only on the node
+  // `kind` field (cluster/file vs treeFolder/treeFile). Cluster mode
+  // preserves its synchronous render path so the existing cluster e2e +
+  // Vitest specs stay green.
   const clusterLayout = useMemo<LaidOutClusterGraph | null>(() => {
     if (!filtered) return null;
     if (graphLayout !== "clusters") return null;
     return computeClusterLayout(filtered, expanded);
   }, [filtered, expanded, graphLayout]);
 
-  const [treeLayout, setTreeLayout] = useState<LaidOutClusterGraph | null>(null);
-  // Worker-error surface — when computeTreeLayout fails, show a dismissible
+  const [asyncLayout, setAsyncLayout] = useState<LaidOutClusterGraph | null>(null);
+  // Worker-error surface — when the async layout fails, show a dismissible
   // banner so the user (and visual-review screenshots) can see something
   // went wrong instead of staring at a blank canvas. Console.error stays as
   // a breadcrumb for /diagnose. Cleared on every successful compute.
   const [layoutError, setLayoutError] = useState<string | null>(null);
   useEffect(() => {
-    if (!filtered || graphLayout !== "tree") {
-      setTreeLayout(null);
+    if (!filtered || graphLayout === "clusters") {
+      setAsyncLayout(null);
       return;
     }
     let stale = false;
-    computeTreeLayout(filtered, expanded)
+    // 3-way dispatch: dendrogram ↔ tree both use the async ELK worker path;
+    // they differ in which layout function they call (flat-with-injected-
+    // hierarchy-edges vs cluster-as-containment-mrtree). Both `then` into
+    // the same setAsyncLayout — toggling between the two flat modes
+    // doesn't double-render because the previous-mode result is replaced
+    // by the new-mode result on the same setter.
+    const layoutFn =
+      graphLayout === "dendrogram" ? computeDendrogramLayout : computeTreeLayout;
+    const layoutName =
+      graphLayout === "dendrogram" ? "computeDendrogramLayout" : "computeTreeLayout";
+    layoutFn(filtered, expanded)
       .then((laid) => {
         if (stale) return;
-        setTreeLayout(laid);
+        setAsyncLayout(laid);
         setLayoutError(null);
       })
       .catch((err: unknown) => {
@@ -115,7 +136,7 @@ export function GraphCanvas() {
         // good layout. Surface to console so /diagnose has a breadcrumb.
         const message = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console
-        console.error("computeTreeLayout failed", err);
+        console.error(`${layoutName} failed`, err);
         setLayoutError(message);
       });
     return () => {
@@ -123,7 +144,7 @@ export function GraphCanvas() {
     };
   }, [filtered, expanded, graphLayout]);
 
-  const layout = graphLayout === "tree" ? treeLayout : clusterLayout;
+  const layout = graphLayout === "clusters" ? clusterLayout : asyncLayout;
 
   const rfNodes: Node[] = useMemo(() => {
     if (!layout) return [];
@@ -151,6 +172,40 @@ export function GraphCanvas() {
           draggable: false,
         };
       }
+      if (n.kind === "treeFolder") {
+        // Dendrogram folder card — flat (no parentNode), click-to-expand
+        // routed through hierarchyStore inside TreeFolderNode itself. Not
+        // selectable (the cluster doesn't represent a file selection), not
+        // draggable (drift would break the dendrogram alignment).
+        return {
+          id: n.id,
+          type: "treeFolder",
+          position: { x: n.x, y: n.y },
+          data: {
+            cluster: n.cluster!,
+            expanded: n.expanded!,
+            // Same total-descendant logic as ClusterNode — direct count
+            // reads as 0 for parents whose files live in nested folders.
+            childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
+          },
+          style: { width: n.width, height: n.height },
+          selectable: false,
+          draggable: false,
+        };
+      }
+      if (n.kind === "treeFile") {
+        // Dendrogram leaf card — flat. Click selection still routed through
+        // ReactFlow's onNodeClick handler below (consistent with FileNode).
+        return {
+          id: n.id,
+          type: "treeFile",
+          position: { x: n.x, y: n.y },
+          data: { file: n.file! },
+          selected: n.id === selectedFileId,
+          style: { width: n.width, height: n.height },
+          draggable: false,
+        };
+      }
       return {
         id: n.id,
         type: "file",
@@ -166,14 +221,18 @@ export function GraphCanvas() {
     });
   }, [layout, selectedFileId]);
 
-  const isTreeMode = graphLayout === "tree";
+  // Both flat modes (dendrogram + tree) share the 2-color hierarchy/reference
+  // edge palette and suppress always-on labels. Cluster mode keeps the full
+  // 6-color palette + ×N chips (user said cluster info-density is fine).
+  const isFlatMode = graphLayout === "dendrogram" || graphLayout === "tree";
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!layout) return [];
     return layout.edges.map((e) => {
-      // Tree mode collapses to 2 colors (hierarchy + cross-ref) per user
-      // feedback 2026-04-22 — the 6-color palette was unreadable as the
-      // default. Cluster mode keeps the full per-kind palette.
-      const style = isTreeMode
+      // Flat modes (dendrogram, tree) collapse to 2 colors (hierarchy +
+      // cross-ref) per user feedback 2026-04-22 — the 6-color palette was
+      // unreadable as the default. Cluster mode keeps the full per-kind
+      // palette.
+      const style = isFlatMode
         ? treeEdgeStyleFor(e.kind, !!e.unresolved)
         : edgeStyleFor(e.kind, !!e.unresolved);
       const isAggregated = e.count > 1;
@@ -182,8 +241,8 @@ export function GraphCanvas() {
       // their always-on `×N` label because the count is real information
       // that hover-to-discover would hide.
       //
-      // Tree-mode override (user feedback 2026-04-22): NO always-on labels
-      // at all. The default tree view is too dense — even `include ×3`
+      // Flat-mode override (user feedback 2026-04-22): NO always-on labels
+      // at all. The default flat view is too dense — even `include ×3`
       // chips piled up unreadably. Aggregated count + kind are surfaced
       // via the edge's accessible label (browser tooltip on hover of the
       // SVG path) instead. Cluster mode keeps the always-on `×N` chips
@@ -192,7 +251,7 @@ export function GraphCanvas() {
       const isEndpointSelected =
         selectedFileId !== null &&
         (e.source === selectedFileId || e.target === selectedFileId);
-      const visibleLabel = isTreeMode
+      const visibleLabel = isFlatMode
         ? undefined
         : aggregatedChip ?? (isEndpointSelected ? e.kind : undefined);
       const hoverDescription = isAggregated
@@ -258,7 +317,7 @@ export function GraphCanvas() {
         labelBgBorderRadius: 6,
       };
     });
-  }, [layout, selectedFileId, isTreeMode]);
+  }, [layout, selectedFileId, isFlatMode]);
 
   // Pre-layout state — render a stable skeleton instead of returning null.
   // Two reasons:
@@ -331,9 +390,10 @@ export function GraphCanvas() {
         edges={rfEdges}
         nodeTypes={nodeTypes}
         onNodeClick={(_e, node) => {
-          // Only file nodes are click-selectable (cluster nodes have their
-          // own header toggle handler).
-          if (node.type === "file") selectFile(node.id);
+          // File nodes are click-selectable (both `file` from cluster mode
+          // and `treeFile` from dendrogram mode). Cluster / treeFolder
+          // nodes have their own toggle handlers.
+          if (node.type === "file" || node.type === "treeFile") selectFile(node.id);
         }}
         onPaneClick={() => selectFile(null)}
         fitView

@@ -212,7 +212,16 @@ describe("computeDendrogramLayout — cross-reference edges", () => {
     // slate hierarchy backbone.
     const result = await computeDendrogramLayout(smallGraph(), new Set(["a", "b"]));
     const firstNonHier = result.edges.findIndex((e) => !e.id.startsWith("hier:"));
-    const lastHier = result.edges.findLastIndex((e) => e.id.startsWith("hier:"));
+    // Walk from the back to find the last hierarchy edge (avoids ES2023's
+    // findLastIndex so the test compiles against the current tsconfig
+    // target).
+    let lastHier = -1;
+    for (let i = result.edges.length - 1; i >= 0; i--) {
+      if (result.edges[i].id.startsWith("hier:")) {
+        lastHier = i;
+        break;
+      }
+    }
     expect(firstNonHier).toBeGreaterThan(lastHier);
   });
 });
