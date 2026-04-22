@@ -6,10 +6,16 @@
 
 | Field | Value |
 |-------|-------|
-| Feature | — |
+| Feature | — idle — |
 | Phase | — |
-| Next | **REMINDER:** user wants to migrate viva to a fresh repo (clean history, no Claude attribution) — surface this when they return. Then queued: (1) `/research xml-ref-resolver` — user reports XML reference resolution misses patterns in their real codebase; (2) Plan Mode design decisions locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when there's appetite; (3) product-strategy conversation: extending viva beyond config formats (Tier 1/2/3). GHCR public visibility confirmed done. |
-| Branch | main |
+| Next | — |
+
+## Reminders (surface when user returns)
+
+- Fresh-repo migration (clean history, no Claude attribution) still on deck.
+- Deferred follow-up branch after this lands: **smart static analysis** — dead-param detection, orphan refs, cycle detection, cross-file schema inference ("replace-an-LLM" ambition). Not in the current branch.
+- Plan Mode design locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when there's appetite.
+- Product-strategy conversation: extending viva beyond config formats (Tier 1/2/3).
 
 ## Locked Decisions
 
@@ -23,6 +29,7 @@ _(empty)_
 
 | Feature | Date | PR |
 |---------|------|----|
+| xml-viewer-hardening | 2026-04-21 | (see PR link once merged) |
 | v1-demo | 2026-04-18 | merged to main |
 | runtime-image | 2026-04-18 | merged to main |
 | ghcr-publish | 2026-04-18 | merged to main |
