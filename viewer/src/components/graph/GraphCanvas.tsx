@@ -21,7 +21,7 @@ import {
   type LaidOutClusterGraph,
 } from "@/lib/graph/cluster-layout";
 import { computeTreeLayout } from "@/lib/graph/tree-layout";
-import { edgeStyleFor } from "./EdgeStyles";
+import { edgeStyleFor, treeEdgeStyleFor } from "./EdgeStyles";
 import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
 import ClusterNode from "./ClusterNode";
@@ -166,10 +166,16 @@ export function GraphCanvas() {
     });
   }, [layout, selectedFileId]);
 
+  const isTreeMode = graphLayout === "tree";
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!layout) return [];
     return layout.edges.map((e) => {
-      const style = edgeStyleFor(e.kind, !!e.unresolved);
+      // Tree mode collapses to 2 colors (hierarchy + cross-ref) per user
+      // feedback 2026-04-22 — the 6-color palette was unreadable as the
+      // default. Cluster mode keeps the full per-kind palette.
+      const style = isTreeMode
+        ? treeEdgeStyleFor(e.kind, !!e.unresolved)
+        : edgeStyleFor(e.kind, !!e.unresolved);
       const isAggregated = e.count > 1;
       // Q3 (research): direct edges show their kind label only on hover
       // (the color + legend already convey the kind). Aggregated edges keep
@@ -237,7 +243,7 @@ export function GraphCanvas() {
         labelBgBorderRadius: 6,
       };
     });
-  }, [layout, selectedFileId]);
+  }, [layout, selectedFileId, isTreeMode]);
 
   // Pre-layout state — render a stable skeleton instead of returning null.
   // Two reasons:

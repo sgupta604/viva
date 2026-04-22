@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { edgeStyleFor, EDGE_KIND_META } from "./EdgeStyles";
+import {
+  edgeStyleFor,
+  EDGE_KIND_META,
+  treeEdgeBucket,
+  treeEdgeStyleFor,
+  TREE_HIERARCHY_COLOR,
+  TREE_CROSSREF_COLOR,
+  TREE_LEGEND_ROWS,
+} from "./EdgeStyles";
 import type { EdgeKind } from "@/lib/graph/types";
 
 describe("edgeStyleFor", () => {
@@ -73,5 +81,79 @@ describe("EDGE_KIND_META", () => {
         expect(style.strokeDasharray).toBe(meta.dasharray);
       }
     }
+  });
+});
+
+describe("treeEdgeBucket (tree-mode 2-color collapse)", () => {
+  it("buckets d-aggregate as hierarchy", () => {
+    expect(treeEdgeBucket("d-aggregate")).toBe("hierarchy");
+  });
+
+  it("buckets every other kind as cross-reference", () => {
+    for (const k of [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "logical-id",
+    ] as const) {
+      expect(treeEdgeBucket(k)).toBe("crossref");
+    }
+  });
+});
+
+describe("treeEdgeStyleFor", () => {
+  it("paints d-aggregate with the hierarchy slate color and thin stroke", () => {
+    const s = treeEdgeStyleFor("d-aggregate", false);
+    expect(s.stroke).toBe(TREE_HIERARCHY_COLOR);
+    expect(s.strokeWidth).toBe(1);
+  });
+
+  it("paints all cross-ref kinds with the same accent color", () => {
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      const s = treeEdgeStyleFor(k, false);
+      expect(s.stroke).toBe(TREE_CROSSREF_COLOR);
+      expect(s.strokeWidth).toBe(1.5);
+    }
+  });
+
+  it("preserves the unresolved error treatment for any kind", () => {
+    for (const k of [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "logical-id",
+      "d-aggregate",
+    ] as const) {
+      const s = treeEdgeStyleFor(k, true);
+      expect(s.stroke).toBe("#ef4444");
+      expect(s.strokeDasharray).toBe("4 3");
+    }
+  });
+
+  it("never re-uses any color from the cluster-mode palette for tree mode", () => {
+    // Confirms the new tree palette is genuinely distinct — if a future
+    // refactor accidentally points tree colors at one of the cluster
+    // colors, this guard fires.
+    const clusterColors = new Set(EDGE_KIND_META.map((m) => m.color));
+    expect(clusterColors.has(TREE_HIERARCHY_COLOR)).toBe(false);
+    expect(clusterColors.has(TREE_CROSSREF_COLOR)).toBe(false);
+  });
+});
+
+describe("TREE_LEGEND_ROWS", () => {
+  it("has exactly two rows: hierarchy + reference", () => {
+    expect(TREE_LEGEND_ROWS.map((r) => r.bucket)).toEqual([
+      "hierarchy",
+      "reference",
+    ]);
+  });
+
+  it("colors match treeEdgeStyleFor for each bucket", () => {
+    const hierarchy = TREE_LEGEND_ROWS.find((r) => r.bucket === "hierarchy")!;
+    const reference = TREE_LEGEND_ROWS.find((r) => r.bucket === "reference")!;
+    expect(hierarchy.color).toBe(treeEdgeStyleFor("d-aggregate", false).stroke);
+    expect(reference.color).toBe(treeEdgeStyleFor("include", false).stroke);
   });
 });

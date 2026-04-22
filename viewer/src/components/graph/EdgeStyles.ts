@@ -56,6 +56,99 @@ export const UNRESOLVED_EDGE_STYLE: EdgeStyleSpec = {
   strokeWidth: 1.5,
 };
 
+/**
+ * Tree-mode 2-color palette (user feedback 2026-04-22).
+ *
+ * The default tree view became unreadable with 6 colors competing on every
+ * line — the user said it was "unusable... hard to tell apart." So in tree
+ * mode we collapse to two semantic buckets:
+ *
+ *   - HIERARCHY (`d-aggregate`): structural parent-file ↔ `.d/` drop-in
+ *     containment. Same role as the box-nesting that React Flow already
+ *     draws via `parentNode`, just for the .d-style relationship that
+ *     doesn't fit the cluster model. Rendered in a low-contrast slate so
+ *     it recedes against the dark canvas.
+ *
+ *   - CROSS-REFERENCE (everything else: include / ref / import / xsd /
+ *     logical-id): semantic links between configs. Soft cyan — distinct
+ *     from hierarchy, present without shouting.
+ *
+ * Cluster mode keeps the full `EDGE_KIND_META` palette because the user
+ * said the multi-color legend is fine in the dense info-rich cluster view.
+ */
+export const TREE_HIERARCHY_COLOR = "#475569"; // slate-600 — recedes
+export const TREE_CROSSREF_COLOR = "#7dd3fc"; // sky-300 — soft accent
+
+const HIERARCHY_KINDS: ReadonlySet<EdgeKind> = new Set<EdgeKind>([
+  "d-aggregate",
+]);
+
+/**
+ * Bucket an edge kind into the tree-mode two-color scheme.
+ * Pure helper — exported for tests and the legend chip.
+ */
+export function treeEdgeBucket(kind: EdgeKind): "hierarchy" | "crossref" {
+  return HIERARCHY_KINDS.has(kind) ? "hierarchy" : "crossref";
+}
+
+export function treeEdgeColor(kind: EdgeKind): string {
+  return treeEdgeBucket(kind) === "hierarchy"
+    ? TREE_HIERARCHY_COLOR
+    : TREE_CROSSREF_COLOR;
+}
+
+/**
+ * Tree-mode counterpart to `edgeStyleFor`. Unresolved still wins (red dashed
+ * stays a hard error signal). Otherwise the kind is bucketed to the 2-color
+ * scheme; `d-aggregate` keeps its thin (1px) weight so structural lines
+ * stay visually subordinate to cross-references.
+ */
+export function treeEdgeStyleFor(
+  kind: EdgeKind,
+  unresolved: boolean,
+): EdgeStyleSpec {
+  if (unresolved) {
+    return { ...UNRESOLVED_EDGE_STYLE };
+  }
+  const bucket = treeEdgeBucket(kind);
+  return {
+    stroke: bucket === "hierarchy" ? TREE_HIERARCHY_COLOR : TREE_CROSSREF_COLOR,
+    strokeWidth: bucket === "hierarchy" ? 1 : 1.5,
+  };
+}
+
+/**
+ * 2-row legend metadata for tree mode. Keeps the same `EdgeKindMeta` shape
+ * the legend already iterates over (label + color + strokeWidth), so the
+ * EdgeLegend component can switch arrays without restructuring its JSX.
+ *
+ * `kind` is repurposed as a bucket key here ("hierarchy" / "reference") —
+ * it's only used for `data-testid="edge-legend-item-${kind}"` and to track
+ * which row is which; it does NOT have to match an `EdgeKind` value because
+ * tree mode never reads it back as an edge kind.
+ */
+export interface TreeLegendRow {
+  bucket: "hierarchy" | "reference";
+  color: string;
+  strokeWidth: number;
+  label: string;
+}
+
+export const TREE_LEGEND_ROWS: readonly TreeLegendRow[] = [
+  {
+    bucket: "hierarchy",
+    color: TREE_HIERARCHY_COLOR,
+    strokeWidth: 1,
+    label: "hierarchy",
+  },
+  {
+    bucket: "reference",
+    color: TREE_CROSSREF_COLOR,
+    strokeWidth: 1.5,
+    label: "reference",
+  },
+] as const;
+
 const META_BY_KIND: Record<EdgeKind, EdgeKindMeta> = EDGE_KIND_META.reduce(
   (acc, m) => {
     acc[m.kind] = m;
