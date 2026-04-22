@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -11,66 +11,129 @@ import "reactflow/dist/style.css";
 import { useGraphStore } from "@/lib/state/graph-store";
 import { useSelectionStore } from "@/lib/state/selection-store";
 import { useFilterStore } from "@/lib/state/filter-store";
+import { useHierarchyStore } from "@/lib/state/hierarchy-store";
 import { applyFilters } from "@/lib/filters/predicates";
-import { computeLayout } from "@/lib/graph/layout";
+import { computeClusterLayout } from "@/lib/graph/cluster-layout";
 import { edgeStyleFor } from "./EdgeStyles";
 import FileNode from "./FileNode";
-import FolderGroup from "./FolderGroup";
+import ClusterNode from "./ClusterNode";
 
 const nodeTypes = {
   file: FileNode,
-  folder: FolderGroup,
+  cluster: ClusterNode,
 };
 
 export function GraphCanvas() {
   const graph = useGraphStore((s) => s.graph);
   const kinds = useFilterStore((s) => s.kinds);
   const hideTests = useFilterStore((s) => s.hideTests);
-  const folder = useFilterStore((s) => s.folder);
   const searchQuery = useFilterStore((s) => s.searchQuery);
   const selectFile = useSelectionStore((s) => s.selectFile);
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
+  const expanded = useHierarchyStore((s) => s.expanded);
+  const expand = useHierarchyStore((s) => s.expand);
+
+  // On first load, auto-expand the top-level if there's exactly one top
+  // cluster (auto-descend-on-single-child-root — Q3 / V.10 requirement).
+  useEffect(() => {
+    if (!graph) return;
+    const clusters = graph.clusters ?? [];
+    if (clusters.length === 0) return;
+    const topClusters = clusters.filter((c) => c.parent === null);
+    if (topClusters.length === 1 && !expanded.has(topClusters[0].path)) {
+      expand(topClusters[0].path);
+    }
+    // Only run when graph changes — expanded reads avoid re-firing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph]);
 
   const filtered = useMemo(() => {
     if (!graph) return null;
-    return applyFilters(graph, { kinds, hideTests, folder, searchQuery });
-  }, [graph, kinds, hideTests, folder, searchQuery]);
+    // v2: folder filter → HIDE semantics is replaced by NAVIGATE (V.7). For
+    // GraphCanvas we ignore state.folder and leave folder-driven navigation
+    // to FilterBar's expandToPath + fitBounds.
+    return applyFilters(graph, {
+      kinds,
+      hideTests,
+      folder: null,
+      searchQuery,
+    });
+  }, [graph, kinds, hideTests, searchQuery]);
 
-  const layout = useMemo(() => (filtered ? computeLayout(filtered) : null), [filtered]);
+  const layout = useMemo(() => {
+    if (!filtered) return null;
+    return computeClusterLayout(filtered, expanded);
+  }, [filtered, expanded]);
 
   const rfNodes: Node[] = useMemo(() => {
     if (!layout) return [];
-    return layout.nodes.map((n) => ({
-      id: n.id,
-      type: "file",
-      position: { x: n.x, y: n.y },
-      data: { file: n.file },
-      selected: n.id === selectedFileId,
-    }));
+    return layout.nodes.map((n) => {
+      if (n.kind === "cluster") {
+        return {
+          id: n.id,
+          type: "cluster",
+          position: { x: n.x, y: n.y },
+          data: {
+            cluster: n.cluster!,
+            expanded: n.expanded!,
+            childCount: n.childCount ?? 0,
+          },
+          style: { width: n.width, height: n.height },
+          selectable: false,
+          draggable: false,
+        };
+      }
+      return {
+        id: n.id,
+        type: "file",
+        // File nodes living inside an expanded cluster use `parentNode` so
+        // React Flow keeps them pinned to the cluster's area; position is
+        // relative to the cluster.
+        parentNode: n.parent ?? undefined,
+        extent: n.parent ? ("parent" as const) : undefined,
+        position: { x: n.x, y: n.y },
+        data: { file: n.file! },
+        selected: n.id === selectedFileId,
+      };
+    });
   }, [layout, selectedFileId]);
 
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!layout) return [];
-    return layout.edges
-      .filter((e) => e.target !== null)
-      .map((e) => {
-        const style = edgeStyleFor(e.kind, !!e.unresolved);
-        return {
-          id: e.id,
-          source: e.source,
-          target: e.target as string,
-          type: "smoothstep",
-          style,
-          markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
-          data: { kind: e.kind, unresolved: e.unresolved },
-          label: e.kind,
-          labelStyle: { fontSize: 10, fill: "#d1d5db", fontWeight: 500 },
-          labelShowBg: true,
-          labelBgStyle: { fill: "#0a0a0a", fillOpacity: 0.95 },
-          labelBgPadding: [6, 3] as [number, number],
-          labelBgBorderRadius: 3,
-        };
-      });
+    return layout.edges.map((e) => {
+      const style = edgeStyleFor(e.kind, !!e.unresolved);
+      const isAggregated = e.count > 1;
+      const label = isAggregated ? `${e.kind} ×${e.count}` : e.kind;
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: "smoothstep",
+        style: {
+          ...style,
+          strokeWidth: isAggregated
+            ? Math.min(6, 1.5 + Math.log2(e.count))
+            : style.strokeWidth,
+        },
+        markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
+        data: {
+          kind: e.kind,
+          unresolved: e.unresolved,
+          count: e.count,
+          kindBreakdown: e.kindBreakdown,
+        },
+        label,
+        labelStyle: {
+          fontSize: 10,
+          fill: "#d1d5db",
+          fontWeight: 500,
+        },
+        labelShowBg: true,
+        labelBgStyle: { fill: "#0a0a0a", fillOpacity: 0.95 },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 3,
+      };
+    });
   }, [layout]);
 
   if (!filtered || !layout) return null;
@@ -81,10 +144,14 @@ export function GraphCanvas() {
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
-        onNodeClick={(_e, node) => selectFile(node.id)}
+        onNodeClick={(_e, node) => {
+          // Only file nodes are click-selectable (cluster nodes have their
+          // own header toggle handler).
+          if (node.type === "file") selectFile(node.id);
+        }}
         onPaneClick={() => selectFile(null)}
         fitView
-        minZoom={0.1}
+        minZoom={0.05}
         nodesConnectable={false}
         edgesUpdatable={false}
         proOptions={{ hideAttribution: true }}
