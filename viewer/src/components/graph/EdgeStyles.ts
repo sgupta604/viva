@@ -118,6 +118,27 @@ export function treeEdgeStyleFor(
 }
 
 /**
+ * Should this edge swallow pointer events? In flat modes (dendrogram/tree)
+ * the `d-aggregate` hierarchy edges are decorative backbone — they draw
+ * the spine of the tree but are not user-interactive. Without this guard
+ * they sit above tree-folder cards (zIndex 1000 vs the React Flow node
+ * default) and intercept Playwright's strict-actionability click — which
+ * was the root cause of the dendrogram-layout E2E "expand round-trip"
+ * failure. Cross-ref edges (include/import/ref/xsd/logical-id) stay
+ * clickable in every mode; cluster mode keeps hierarchy edges clickable
+ * because cluster boxes ARE legitimate edge endpoints in that view.
+ *
+ * Pure helper, exported for the GraphCanvas edge mapper AND for tests
+ * that lock the invariant.
+ */
+export function shouldDisablePointerEvents(
+  kind: EdgeKind,
+  isFlatMode: boolean,
+): boolean {
+  return isFlatMode && kind === "d-aggregate";
+}
+
+/**
  * 2-row legend metadata for tree mode. Keeps the same `EdgeKindMeta` shape
  * the legend already iterates over (label + color + strokeWidth), so the
  * EdgeLegend component can switch arrays without restructuring its JSX.

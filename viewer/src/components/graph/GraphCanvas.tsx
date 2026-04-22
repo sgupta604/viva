@@ -22,7 +22,11 @@ import {
 } from "@/lib/graph/cluster-layout";
 import { computeTreeLayout } from "@/lib/graph/tree-layout";
 import { computeDendrogramLayout } from "@/lib/graph/dendrogram-layout";
-import { edgeStyleFor, treeEdgeStyleFor } from "./EdgeStyles";
+import {
+  edgeStyleFor,
+  shouldDisablePointerEvents,
+  treeEdgeStyleFor,
+} from "./EdgeStyles";
 import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
 import ClusterNode from "./ClusterNode";
@@ -177,10 +181,20 @@ export function GraphCanvas() {
         // routed through hierarchyStore inside TreeFolderNode itself. Not
         // selectable (the cluster doesn't represent a file selection), not
         // draggable (drift would break the dendrogram alignment).
+        //
+        // zIndex: 1100 lifts treeFolder cards above the edge layer (which
+        // sits at zIndex: 1000 — see edge-z-order comment below). Without
+        // this, hierarchy edges drawn over a folder card intercept the
+        // pointer and Playwright's strict actionability check fails the
+        // click ("element intercepts pointer events"). This is the fix for
+        // the dendrogram-layout E2E "expand state survives round-trip"
+        // failure (folder.click() failing because d-aggregate hierarchy
+        // edges sat above the card).
         return {
           id: n.id,
           type: "treeFolder",
           position: { x: n.x, y: n.y },
+          zIndex: 1100,
           data: {
             cluster: n.cluster!,
             expanded: n.expanded!,
@@ -196,10 +210,13 @@ export function GraphCanvas() {
       if (n.kind === "treeFile") {
         // Dendrogram leaf card — flat. Click selection still routed through
         // ReactFlow's onNodeClick handler below (consistent with FileNode).
+        // zIndex: 1100 — same rationale as treeFolder above; keeps clicks
+        // landing on the leaf card rather than on overlaid hierarchy edges.
         return {
           id: n.id,
           type: "treeFile",
           position: { x: n.x, y: n.y },
+          zIndex: 1100,
           data: { file: n.file! },
           selected: n.id === selectedFileId,
           style: { width: n.width, height: n.height },
@@ -261,6 +278,22 @@ export function GraphCanvas() {
       // children by default. Bump zIndex so config edges stay visible
       // crossing a cluster fill — fixes the "d-aggregate ×12 underneath
       // parameters.d / resolve.d" symptom from image copy.png.
+      //
+      // POINTER-EVENTS (flat modes only): in dendrogram + tree mode the
+      // d-aggregate "hierarchy" edges are decorative backbone — they exist
+      // to draw the spine of the tree, not to be clicked. With zIndex 1000
+      // they sit above the canvas and (before the treeFolder/treeFile
+      // zIndex bump) could intercept clicks meant for folder cards. Even
+      // with the node z-index fix, killing pointer events here is
+      // defense-in-depth: hierarchy edges should never eat a user click.
+      // Cluster-mode hierarchy edges stay clickable because cluster boxes
+      // ARE the legitimate edge endpoints in that view, and cross-ref
+      // edges (include/import/ref/xsd/logical-id) keep pointer events in
+      // every mode because users may click them to inspect the relation.
+      const isHierarchyInFlatMode = shouldDisablePointerEvents(
+        e.kind,
+        isFlatMode,
+      );
       return {
         id: e.id,
         source: e.source,
@@ -272,6 +305,7 @@ export function GraphCanvas() {
           strokeWidth: isAggregated
             ? Math.min(6, 1.5 + Math.log2(e.count))
             : style.strokeWidth,
+          ...(isHierarchyInFlatMode ? { pointerEvents: "none" as const } : {}),
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
         // ariaLabel renders as a native browser tooltip on the SVG path
