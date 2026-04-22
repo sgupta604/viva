@@ -14,8 +14,13 @@ import { useGraphStore } from "@/lib/state/graph-store";
 import { useSelectionStore } from "@/lib/state/selection-store";
 import { useFilterStore } from "@/lib/state/filter-store";
 import { useHierarchyStore } from "@/lib/state/hierarchy-store";
+import { useViewStore } from "@/lib/state/view-store";
 import { applyFilters } from "@/lib/filters/predicates";
-import { computeClusterLayout } from "@/lib/graph/cluster-layout";
+import {
+  computeClusterLayout,
+  type LaidOutClusterGraph,
+} from "@/lib/graph/cluster-layout";
+import { computeTreeLayout } from "@/lib/graph/tree-layout";
 import { edgeStyleFor } from "./EdgeStyles";
 import FileNode from "./FileNode";
 import ClusterNode from "./ClusterNode";
@@ -36,6 +41,7 @@ export function GraphCanvas() {
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
   const expanded = useHierarchyStore((s) => s.expanded);
   const expand = useHierarchyStore((s) => s.expand);
+  const graphLayout = useViewStore((s) => s.graphLayout);
 
   const [zoomMode, setZoomMode] = useState<ZoomMode>("detail");
   // Listen for viewport changes; flip CSS class, never recompute layout.
@@ -73,10 +79,41 @@ export function GraphCanvas() {
     });
   }, [graph, kinds, hideTests, searchQuery]);
 
-  const layout = useMemo(() => {
+  // Cluster mode is sync (recursive grid-pack on the main thread); tree mode
+  // is async (mrtree via the elkjs Web Worker, with main-thread fallback in
+  // jsdom). Both produce LaidOutClusterGraph — React Flow downstream is
+  // identical. Cluster mode preserves its synchronous render path so the
+  // existing cluster e2e + Vitest specs stay green.
+  const clusterLayout = useMemo<LaidOutClusterGraph | null>(() => {
     if (!filtered) return null;
+    if (graphLayout !== "clusters") return null;
     return computeClusterLayout(filtered, expanded);
-  }, [filtered, expanded]);
+  }, [filtered, expanded, graphLayout]);
+
+  const [treeLayout, setTreeLayout] = useState<LaidOutClusterGraph | null>(null);
+  useEffect(() => {
+    if (!filtered || graphLayout !== "tree") {
+      setTreeLayout(null);
+      return;
+    }
+    let stale = false;
+    computeTreeLayout(filtered, expanded)
+      .then((laid) => {
+        if (!stale) setTreeLayout(laid);
+      })
+      .catch((err: unknown) => {
+        if (stale) return;
+        // Don't blank the canvas on transient worker errors — keep the last
+        // good layout. Surface to console so /diagnose has a breadcrumb.
+        // eslint-disable-next-line no-console
+        console.error("computeTreeLayout failed", err);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [filtered, expanded, graphLayout]);
+
+  const layout = graphLayout === "tree" ? treeLayout : clusterLayout;
 
   const rfNodes: Node[] = useMemo(() => {
     if (!layout) return [];
