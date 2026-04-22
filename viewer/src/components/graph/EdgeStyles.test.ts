@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   edgeStyleFor,
   EDGE_KIND_META,
+  shouldDisablePointerEvents,
   treeEdgeBucket,
   treeEdgeStyleFor,
   TREE_HIERARCHY_COLOR,
@@ -139,6 +140,36 @@ describe("treeEdgeStyleFor", () => {
     const clusterColors = new Set(EDGE_KIND_META.map((m) => m.color));
     expect(clusterColors.has(TREE_HIERARCHY_COLOR)).toBe(false);
     expect(clusterColors.has(TREE_CROSSREF_COLOR)).toBe(false);
+  });
+});
+
+describe("shouldDisablePointerEvents (flat-mode hierarchy decoration)", () => {
+  // INVARIANT LOCK: in dendrogram + tree mode, the d-aggregate hierarchy
+  // edges are decorative backbone — they MUST NOT swallow pointer events
+  // or they intercept clicks meant for treeFolder cards underneath. This
+  // is the regression-prevention guard for the dendrogram-layout E2E
+  // "expand state survives round-trip" failure (folder.click() failing
+  // because hierarchy edges sat above the card and ate the pointer).
+  it("disables pointer events for d-aggregate edges in flat (dendrogram/tree) mode", () => {
+    expect(shouldDisablePointerEvents("d-aggregate", true)).toBe(true);
+  });
+
+  it("keeps pointer events on d-aggregate edges in cluster mode", () => {
+    // Cluster mode: cluster boxes ARE legitimate edge endpoints, so the
+    // hierarchy edges can stay clickable. Only the flat modes have the
+    // overlap-with-folder-card problem.
+    expect(shouldDisablePointerEvents("d-aggregate", false)).toBe(false);
+  });
+
+  it("keeps pointer events on every cross-ref kind in every mode", () => {
+    // Cross-ref edges (include/import/ref/xsd/logical-id) are user-
+    // interactive in every mode — clicking them is a planned affordance
+    // for inspecting the relation. Killing pointer events on them would
+    // be a UX regression even in flat mode.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(shouldDisablePointerEvents(k, true)).toBe(false);
+      expect(shouldDisablePointerEvents(k, false)).toBe(false);
+    }
   });
 });
 
