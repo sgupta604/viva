@@ -25,6 +25,7 @@
  *     aggregation, not author-visible folder" per research Q13.
  */
 import { memo, type KeyboardEvent } from "react";
+import { Handle, Position } from "reactflow";
 import { useHierarchyStore } from "@/lib/state/hierarchy-store";
 import type { ClusterNode as ClusterNodeData } from "@/lib/graph/types";
 import { CLUSTER_HEADER_HEIGHT } from "@/lib/graph/layout";
@@ -69,10 +70,24 @@ function ClusterNodeInner({ data }: ClusterNodeProps) {
         aria-label={`cluster ${cluster.path} (${childCount} files) — press to expand`}
         data-testid={`cluster-${cluster.path}`}
         data-cluster-kind={cluster.kind}
+        data-cluster-path={cluster.path}
+        data-cluster-parent={cluster.parent ?? ""}
         onClick={onToggle}
         onKeyDown={onKey}
         className={`h-full w-full cursor-pointer rounded-lg border-2 ${borderStyle} ${borderColor} bg-neutral-900/70 px-3 py-2 text-left transition hover:bg-neutral-900`}
       >
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!bg-neutral-500"
+          isConnectable={false}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!bg-neutral-500"
+          isConnectable={false}
+        />
         <div className="flex items-center gap-2">
           <span aria-hidden="true" className="text-neutral-400">
             ▸
@@ -102,8 +117,22 @@ function ClusterNodeInner({ data }: ClusterNodeProps) {
       className={`h-full w-full rounded-lg border ${borderStyle} ${borderColor} bg-neutral-900/30`}
       data-testid={`cluster-${cluster.path}`}
       data-cluster-kind={cluster.kind}
+      data-cluster-path={cluster.path}
+      data-cluster-parent={cluster.parent ?? ""}
       data-expanded="true"
     >
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!bg-neutral-500"
+        isConnectable={false}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!bg-neutral-500"
+        isConnectable={false}
+      />
       <div
         role="button"
         tabIndex={0}

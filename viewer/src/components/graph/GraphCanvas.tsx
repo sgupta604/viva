@@ -6,7 +6,6 @@ import ReactFlow, {
   type Edge as RFEdge,
   MarkerType,
   useOnViewportChange,
-  ReactFlowProvider,
   type Viewport,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -27,8 +26,8 @@ const nodeTypes = {
   cluster: ClusterNode,
 };
 
-/** Inner component — must be rendered inside ReactFlowProvider. */
-function GraphCanvasInner() {
+/** Inner component — must be rendered inside ReactFlowProvider (see App.tsx). */
+export function GraphCanvas() {
   const graph = useGraphStore((s) => s.graph);
   const kinds = useFilterStore((s) => s.kinds);
   const hideTests = useFilterStore((s) => s.hideTests);
@@ -197,11 +196,3 @@ function GraphCanvasInner() {
   );
 }
 
-/** Public wrapper — installs ReactFlowProvider so the viewport hook is valid. */
-export function GraphCanvas() {
-  return (
-    <ReactFlowProvider>
-      <GraphCanvasInner />
-    </ReactFlowProvider>
-  );
-}

@@ -1,8 +1,10 @@
 /**
  * ClusterNode unit tests (V.3).
  */
+import type { ReactElement } from "react";
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { ReactFlowProvider } from "reactflow";
 import ClusterNode from "./ClusterNode";
 import {
   useHierarchyStore,
@@ -20,6 +22,15 @@ function mkCluster(kind: "folder" | "d-aggregate"): ClusterNodeData {
   };
 }
 
+/**
+ * ClusterNode renders React Flow `<Handle>` components so cluster-to-cluster
+ * edges can dock. `<Handle>` reads from ReactFlowProvider context, so tests
+ * must wrap the node accordingly.
+ */
+const withProvider = (el: ReactElement) => (
+  <ReactFlowProvider>{el}</ReactFlowProvider>
+);
+
 describe("ClusterNode", () => {
   beforeEach(() => {
     sessionStorage.removeItem(HIERARCHY_STORAGE_KEY);
@@ -32,7 +43,7 @@ describe("ClusterNode", () => {
       expanded: false,
       childCount: 3,
     };
-    render(<ClusterNode data={data} />);
+    render(withProvider(<ClusterNode data={data} />));
     expect(screen.getByTestId("cluster-a/b")).toBeInTheDocument();
     // Badge text = childCount
     expect(screen.getByText("3")).toBeInTheDocument();
@@ -46,7 +57,7 @@ describe("ClusterNode", () => {
       expanded: false,
       childCount: 3,
     };
-    render(<ClusterNode data={data} />);
+    render(withProvider(<ClusterNode data={data} />));
     const header = screen.getByRole("button");
     fireEvent.click(header);
     expect(useHierarchyStore.getState().isExpanded("a/b")).toBe(true);
@@ -58,7 +69,7 @@ describe("ClusterNode", () => {
       expanded: false,
       childCount: 3,
     };
-    render(<ClusterNode data={data} />);
+    render(withProvider(<ClusterNode data={data} />));
     const header = screen.getByRole("button");
     fireEvent.keyDown(header, { key: "Enter" });
     expect(useHierarchyStore.getState().isExpanded("a/b")).toBe(true);
@@ -70,7 +81,7 @@ describe("ClusterNode", () => {
       expanded: false,
       childCount: 5,
     };
-    render(<ClusterNode data={data} />);
+    render(withProvider(<ClusterNode data={data} />));
     const el = screen.getByTestId("cluster-a/b");
     expect(el.getAttribute("data-cluster-kind")).toBe("d-aggregate");
   });
@@ -81,7 +92,7 @@ describe("ClusterNode", () => {
       expanded: true,
       childCount: 3,
     };
-    render(<ClusterNode data={data} />);
+    render(withProvider(<ClusterNode data={data} />));
     const header = screen.getByRole("button");
     expect(header.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText("▾")).toBeInTheDocument();

@@ -67,3 +67,133 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
     await expect(top02).toHaveAttribute("data-expanded", "true");
   });
 });
+
+/**
+ * Nested-cluster rendering (Bug 1 fix) — the 3k fixture has top clusters whose
+ * childClusters are mid-level sub-clusters. Pre-fix, expanding a top-level
+ * cluster showed an empty interior because only childFiles were emitted.
+ */
+test.describe("Nested-cluster rendering (Bug 1)", () => {
+  test("expanded cluster reveals child sub-clusters in DOM", async ({ page }) => {
+    await page.goto("/?graph=large");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await page.waitForTimeout(400);
+
+    // Pre-expand count of children-of-top05 (by cluster-parent attribute).
+    const midBefore = await page
+      .locator('[data-cluster-parent="top05"]')
+      .count();
+    expect(midBefore).toBe(0);
+
+    // Expand top05 — its children are mid00..mid14 clusters.
+    const top = page.getByTestId("cluster-top05");
+    await top.click();
+    await page.waitForTimeout(400);
+
+    // Assert child clusters are now in the DOM, with the expected parent link.
+    const midAfter = await page
+      .locator('[data-cluster-parent="top05"]')
+      .count();
+    expect(midAfter).toBeGreaterThan(0);
+  });
+
+  test("multi-level descent: expand top → mid → leaf files", async ({ page }) => {
+    await page.goto("/?graph=large");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await page.waitForTimeout(400);
+
+    // Expand top03
+    await page.getByTestId("cluster-top03").click();
+    await page.waitForTimeout(300);
+    // mid00 under top03 should now be a clickable cluster.
+    const mid = page.getByTestId("cluster-top03/mid00");
+    await expect(mid).toBeVisible();
+    // Before expanding the mid, there are no file nodes under it.
+    const filesBefore = await page.locator("[data-testid^='node-']").count();
+    // Expand the mid cluster
+    await mid.click();
+    await page.waitForTimeout(400);
+    const filesAfter = await page.locator("[data-testid^='node-']").count();
+    expect(filesAfter).toBeGreaterThan(filesBefore);
+  });
+});
+
+/**
+ * Edge rendering (Bug 3 fix) — intra-top-cluster edges need to retarget to
+ * the nearest VISIBLE ancestor, not blindly to the top cluster. The 3k
+ * fixture has d-aggregate edges under top00..top01 (sibling xml file →
+ * children of mid14.d/). With only top00 expanded, those endpoints retarget
+ * to different visible nodes (file + sub-cluster) and must render as edges.
+ */
+test.describe("Edges render as SVG paths (Bug 3)", () => {
+  test("expanded cluster with intra-cluster edges draws at least one path", async ({ page }) => {
+    await page.goto("/?graph=large");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await page.waitForTimeout(400);
+
+    // Before expand — only top-level clusters; all 3k-fixture edges retarget
+    // to cross-top pairs (logical-id) OR intra-top (include/d-aggregate).
+    // The logical-id edges are cross-top so they render at overview already.
+    const pathsAtOverview = await page
+      .locator("svg.react-flow__edges path.react-flow__edge-path")
+      .count();
+    expect(pathsAtOverview).toBeGreaterThan(0);
+
+    // Expand top00 → its sibling xml file + mid14.d/ sub-cluster become
+    // visible, so d-aggregate edges now draw WITHIN top00.
+    await page.getByTestId("cluster-top00").click();
+    await page.waitForTimeout(400);
+    const pathsAfterExpand = await page
+      .locator("svg.react-flow__edges path.react-flow__edge-path")
+      .count();
+    expect(pathsAfterExpand).toBeGreaterThanOrEqual(pathsAtOverview);
+  });
+});
+
+/**
+ * Folder-dropdown navigation (Bug 2 fix) — selecting a deep folder must
+ * actually shift the viewport, not silently fitView on the whole graph.
+ */
+test.describe("Folder dropdown shifts viewport (Bug 2)", () => {
+  test("selecting a deep folder expands ancestors AND shifts the viewport", async ({ page }) => {
+    await page.goto("/?graph=large");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await page.waitForTimeout(500);
+
+    const viewport = page.locator(".react-flow__viewport").first();
+    const parseTransform = (s: string | null) => {
+      if (!s) return { tx: 0, ty: 0, scale: 1 };
+      const m = s.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([-\d.]+)\)/);
+      if (!m) return { tx: 0, ty: 0, scale: 1 };
+      return { tx: +m[1], ty: +m[2], scale: +m[3] };
+    };
+
+    const before = parseTransform(await viewport.getAttribute("style"));
+
+    // Pick a deep path. The large fixture has `top10/mid05` available.
+    await page.getByTestId("filter-folder").selectOption("top10/mid05");
+    // Wait for rAF-deferred fitBounds animation (400ms duration + slack).
+    await page.waitForTimeout(1200);
+
+    // All ancestors of top10/mid05 should now be expanded.
+    await expect(page.getByTestId("cluster-top10")).toHaveAttribute(
+      "data-expanded",
+      "true",
+    );
+    await expect(page.getByTestId("cluster-top10/mid05")).toHaveAttribute(
+      "data-expanded",
+      "true",
+    );
+
+    // Viewport must have shifted OR zoomed (either component changes).
+    const after = parseTransform(await viewport.getAttribute("style"));
+    const moved =
+      Math.abs(after.tx - before.tx) > 10 ||
+      Math.abs(after.ty - before.ty) > 10 ||
+      Math.abs(after.scale - before.scale) > 0.01;
+    expect(
+      moved,
+      `viewport transform did not shift (before=${JSON.stringify(before)} after=${JSON.stringify(after)})`,
+    ).toBe(true);
+  });
+});

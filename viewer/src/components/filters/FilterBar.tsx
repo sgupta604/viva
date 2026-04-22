@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useReactFlow } from "reactflow";
+import { useReactFlow, type Node } from "reactflow";
 import { useFilterStore } from "@/lib/state/filter-store";
 import { useGraphStore } from "@/lib/state/graph-store";
 import { useHierarchyStore } from "@/lib/state/hierarchy-store";
@@ -7,6 +7,52 @@ import { applyFilters } from "@/lib/filters/predicates";
 import type { FileKind } from "@/lib/graph/types";
 
 const KINDS: FileKind[] = ["xml", "yaml", "json", "ini"];
+
+/**
+ * Absolute position of a React Flow node, accounting for compound-node
+ * `parentNode` nesting: child positions are stored relative to their parent,
+ * so we sum offsets along the parent chain.
+ */
+function absolutePosition(
+  node: Node,
+  allById: Map<string, Node>,
+): { x: number; y: number } {
+  let x = node.position.x;
+  let y = node.position.y;
+  let parentId = node.parentNode;
+  let safety = 32;
+  while (parentId && safety > 0) {
+    const p = allById.get(parentId);
+    if (!p) break;
+    x += p.position.x;
+    y += p.position.y;
+    parentId = p.parentNode;
+    safety -= 1;
+  }
+  return { x, y };
+}
+
+/** Absolute bounding rect covering the given nodes; sized + positioned. */
+function boundingRect(
+  nodes: Node[],
+  allById: Map<string, Node>,
+): { x: number; y: number; width: number; height: number } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const n of nodes) {
+    const { x, y } = absolutePosition(n, allById);
+    const w = n.width ?? 0;
+    const h = n.height ?? 0;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x + w > maxX) maxX = x + w;
+    if (y + h > maxY) maxY = y + h;
+  }
+  if (!isFinite(minX)) return { x: 0, y: 0, width: 0, height: 0 };
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
 
 /**
  * V.7 — the folder dropdown's semantics flip from HIDE to NAVIGATE.
@@ -35,11 +81,18 @@ export function FilterBar() {
   // renders above the canvas so we guard with a try/catch when the provider
   // isn't mounted (e.g. Folder/Table views).
   let fitView: (() => void) | null = null;
-  let fitBounds: ((bounds: { x: number; y: number; width: number; height: number }) => void) | null = null;
+  let fitBounds:
+    | ((bounds: { x: number; y: number; width: number; height: number }) => void)
+    | null = null;
+  let getNode: ((id: string) => Node | undefined) | null = null;
+  let getNodes: (() => Node[]) | null = null;
   try {
     const rf = useReactFlow();
-    fitView = () => rf.fitView({ padding: 0.15 });
-    fitBounds = (bounds) => rf.fitBounds(bounds, { padding: 0.2 });
+    fitView = () => rf.fitView({ padding: 0.15, duration: 400 });
+    fitBounds = (bounds) =>
+      rf.fitBounds(bounds, { padding: 0.2, duration: 400 });
+    getNode = (id) => rf.getNode(id);
+    getNodes = () => rf.getNodes();
   } catch {
     // no provider — navigation fitView is a no-op
   }
@@ -75,16 +128,48 @@ export function FilterBar() {
       if (fitView) fitView();
       return;
     }
-    // Jump to folder: expand ancestors and fit the cluster area.
+    // Jump to folder: expand the ancestor chain and navigate the viewport
+    // to the target cluster. Expansion triggers a layout recompute on the
+    // next tick; React Flow then measures nodes asynchronously via
+    // ResizeObserver. We poll getNode up to ~500ms for the measured target
+    // before falling back to the best ancestor we can measure.
     expandToPath(val);
-    if (fitBounds && graph?.clusters) {
-      // Heuristic fit: rely on the consumer's fitView after expansion — a
-      // precise cluster bound needs the laid-out graph, which FilterBar
-      // doesn't compute. fitView is a safe fallback. E2E specs assert
-      // sibling preservation by checking DOM presence.
-      if (fitView) fitView();
-    } else if (fitView) {
-      fitView();
+
+    const tryNavigate = (attempt: number): void => {
+      if (!getNode || !fitBounds) {
+        if (fitView) fitView();
+        return;
+      }
+      const all = getNodes?.() ?? [];
+      const allById = new Map(all.map((n) => [n.id, n]));
+      const target = getNode(val);
+      if (target && target.width != null && target.height != null) {
+        fitBounds(boundingRect([target], allById));
+        return;
+      }
+      if (attempt < 10) {
+        // React Flow measures nodes asynchronously via ResizeObserver — poll.
+        if (typeof window !== "undefined") {
+          window.requestAnimationFrame(() => tryNavigate(attempt + 1));
+        }
+        return;
+      }
+      // Give up waiting; fit the closest ancestor we CAN measure.
+      const ancestors = val.split("/").map((_, i, a) => a.slice(0, i + 1).join("/"));
+      const hits = all.filter(
+        (n) => ancestors.includes(n.id) && n.width != null && n.height != null,
+      );
+      if (hits.length === 0) {
+        if (fitView) fitView();
+        return;
+      }
+      fitBounds(boundingRect(hits, allById));
+    };
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => tryNavigate(0));
+    } else {
+      tryNavigate(0);
     }
   };
 

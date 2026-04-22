@@ -12,19 +12,23 @@
  *  2. **Deterministic** — same input ⇒ same output. Enables caching + stable
  *     Playwright assertions.
  *  3. **Cross-cluster edge retargeting** — when an edge crosses a boundary
- *     whose endpoint cluster is collapsed, retarget that endpoint to the
- *     cluster path so the edge remains visible.
+ *     whose endpoint is not a visible node, retarget it up the cluster chain
+ *     to the nearest visible ancestor so the edge remains drawable.
  *  4. **Synchronous for now.** elkjs-in-Worker is wired via `layout.worker.ts`;
  *     the pure math here runs on the main thread. The Worker path produces
  *     aesthetically-better positions for larger graphs but is not required
  *     for correctness — Playwright and Vitest drive this sync path.
  *
- * Layout heuristic (sync): simple grid packing.
- *   - Clusters arranged in a row (top-level only; nested cluster support is
- *     a v2.1 extension — not needed for current fixtures).
- *   - Files inside an expanded cluster arranged in a grid.
- *   - Collapsed clusters render as COLLAPSED_CLUSTER_W × COLLAPSED_CLUSTER_H tiles.
- *   - Expanded clusters size to fit their children + CLUSTER_HEADER_HEIGHT.
+ * Layout heuristic (sync): recursive grid packing.
+ *   - Top-level clusters flow left-to-right across CLUSTERS_PER_ROW columns.
+ *   - Inside an EXPANDED cluster:
+ *       * sub-clusters (themselves collapsible) are laid out first in a grid
+ *       * child files are laid out below the sub-cluster grid, also in a grid
+ *       * the recursion descends based on each sub-cluster's own expanded flag
+ *   - Collapsed clusters render as COLLAPSED_CLUSTER_W × COLLAPSED_CLUSTER_H tiles
+ *     and omit their descendants from `nodes[]` entirely (virtualization).
+ *   - Container size is computed bottom-up from laid-out descendants, so the
+ *     React Flow compound node is big enough to contain them.
  */
 import type { Graph, FileNode, Edge, ClusterNode } from "./types";
 import {
@@ -43,14 +47,14 @@ export interface LaidOutGraphNode {
   y: number;
   width: number;
   height: number;
-  /** File nodes: the parent cluster id (matches React Flow `parentNode`). */
+  /** Parent cluster id (matches React Flow `parentNode`); null at top level. */
   parent: string | null;
   /** File nodes: the original FileNode. Cluster nodes: the ClusterNode. */
   file?: FileNode;
   cluster?: ClusterNode;
   /** Collapsed/expanded flag for cluster nodes; file nodes always undefined. */
   expanded?: boolean;
-  /** Count of files inside a cluster (for badge in ClusterNode header). */
+  /** Count of direct child files inside a cluster (for badge in ClusterNode header). */
   childCount?: number;
 }
 
@@ -83,8 +87,9 @@ const INNER_COL_GAP = 24;
 const INNER_ROW_GAP = 24;
 const CLUSTERS_PER_ROW = 5;
 
-/** Grid size for files inside an expanded cluster. Keeps width bounded. */
+/** Grid size for children (files or sub-clusters) inside an expanded cluster. */
 const FILES_PER_ROW = 3;
+const SUBCLUSTERS_PER_ROW = 3;
 
 /**
  * Compute cluster layout. See module doc.
@@ -97,54 +102,41 @@ export function computeClusterLayout(
   expanded: Set<string>,
 ): LaidOutClusterGraph {
   const clusters = graph.clusters ?? [];
-  // Top-level clusters first. Nested clusters are kept in the list but laid
-  // out via their parent's grid.
+  const clustersByPath = new Map<string, ClusterNode>();
+  for (const c of clusters) clustersByPath.set(c.path, c);
+
+  const filesById = new Map<string, FileNode>();
+  for (const f of graph.files) filesById.set(f.id, f);
+
+  // Map each file id to the ordered chain of cluster paths from leaf cluster
+  // up to top-level, e.g. ["a/b/c", "a/b", "a"]. Used for edge retargeting —
+  // we walk the chain and pick the nearest ancestor currently visible.
+  const fileToClusterChain = buildFileToClusterChain(graph, clusters, clustersByPath);
+
+  const nodes: LaidOutGraphNode[] = [];
+
   const topClusters = clusters
     .filter((c) => c.parent === null)
     .slice()
     .sort((a, b) => a.path.localeCompare(b.path));
 
-  const filesById = new Map<string, FileNode>();
-  for (const f of graph.files) filesById.set(f.id, f);
-
-  // Map each file id to its owning top-level cluster path. Used for
-  // cross-cluster edge retargeting.
-  const fileToTopCluster = buildFileToTopCluster(graph, clusters);
-
-  const nodes: LaidOutGraphNode[] = [];
-
-  // Layout pass — simple row-of-grids packing.
+  // Top-level packing: row-of-grids.
   let rowHeight = 0;
   let colX = 0;
   let baseY = 0;
   let colIdx = 0;
 
   for (const cluster of topClusters) {
-    const isExpanded = expanded.has(cluster.path);
-    const childFiles = (cluster.childFiles ?? [])
-      .map((id) => filesById.get(id))
-      .filter((f): f is FileNode => !!f);
+    // Recursive pass — compute this cluster AND all of its expanded
+    // descendants in a temp array with positions RELATIVE to this cluster.
+    const { width, height, descendants } = layoutCluster(
+      cluster,
+      clustersByPath,
+      filesById,
+      expanded,
+    );
 
-    let clusterW: number;
-    let clusterH: number;
-
-    if (!isExpanded) {
-      clusterW = COLLAPSED_CLUSTER_W;
-      clusterH = COLLAPSED_CLUSTER_H;
-    } else {
-      const rows = Math.max(1, Math.ceil(childFiles.length / FILES_PER_ROW));
-      const innerW =
-        FILES_PER_ROW * NODE_W +
-        (FILES_PER_ROW - 1) * INNER_COL_GAP;
-      clusterW = innerW + CLUSTER_PADDING * 2;
-      clusterH =
-        CLUSTER_HEADER_HEIGHT +
-        CLUSTER_PADDING * 2 +
-        rows * NODE_H +
-        (rows - 1) * INNER_ROW_GAP;
-    }
-
-    // Wrap to next row
+    // Wrap to next row if we've placed CLUSTERS_PER_ROW at this level.
     if (colIdx >= CLUSTERS_PER_ROW) {
       colIdx = 0;
       colX = 0;
@@ -152,93 +144,206 @@ export function computeClusterLayout(
       rowHeight = 0;
     }
 
-    const clusterX = colX;
-    const clusterY = baseY;
-
+    // Emit the top cluster at (colX, baseY); its descendants use parentNode
+    // relationships so React Flow treats their positions as relative.
     nodes.push({
       id: cluster.path,
       kind: "cluster",
-      x: clusterX,
-      y: clusterY,
-      width: clusterW,
-      height: clusterH,
-      parent: cluster.parent,
+      x: colX,
+      y: baseY,
+      width,
+      height,
+      parent: null,
       cluster,
-      expanded: isExpanded,
-      childCount: childFiles.length,
+      expanded: expanded.has(cluster.path),
+      childCount: (cluster.childFiles ?? []).length,
     });
+    // Descendants are already positioned relative to their immediate parent
+    // cluster (React Flow compound-node convention), so we push them verbatim.
+    for (const d of descendants) nodes.push(d);
 
-    if (isExpanded) {
-      childFiles.forEach((f, idx) => {
-        const row = Math.floor(idx / FILES_PER_ROW);
-        const col = idx % FILES_PER_ROW;
-        nodes.push({
-          id: f.id,
-          kind: "file",
-          x: CLUSTER_PADDING + col * (NODE_W + INNER_COL_GAP),
-          y:
-            CLUSTER_HEADER_HEIGHT +
-            CLUSTER_PADDING +
-            row * (NODE_H + INNER_ROW_GAP),
-          width: NODE_W,
-          height: NODE_H,
-          parent: cluster.path,
-          file: f,
-        });
-      });
-    }
-
-    colX += clusterW + CLUSTER_COL_GAP;
-    rowHeight = Math.max(rowHeight, clusterH);
+    colX += width + CLUSTER_COL_GAP;
+    rowHeight = Math.max(rowHeight, height);
     colIdx += 1;
   }
 
-  // Edge pass — retarget to clusters when endpoint is virtualized out.
+  // Edge pass — retarget to clusters when endpoint isn't a visible node,
+  // walking up to the NEAREST visible ancestor (not blindly the top cluster).
   const visibleIds = new Set(nodes.map((n) => n.id));
   const edges = retargetEdges(graph.edges, {
     visibleIds,
-    fileToTopCluster,
-    expanded,
+    fileToClusterChain,
   });
 
   return { nodes, edges };
 }
 
 /**
- * Build a map  fileId → top-level cluster path  by walking cluster parents.
- * Files in nested clusters roll up to their top-level ancestor for
- * edge-retargeting purposes (same UX principle as collapsed-cluster edges:
- * whatever is visible gets the edge).
+ * Lay out a single cluster and (if expanded) its descendants.
+ *
+ * Returns the cluster's own width/height plus a flat list of descendant nodes
+ * with positions RELATIVE to this cluster (React Flow `parentNode` convention).
+ * The caller places THIS cluster wherever it likes; the descendants follow
+ * automatically because their coordinates are parent-relative.
  */
-function buildFileToTopCluster(
+function layoutCluster(
+  cluster: ClusterNode,
+  clustersByPath: Map<string, ClusterNode>,
+  filesById: Map<string, FileNode>,
+  expanded: Set<string>,
+): { width: number; height: number; descendants: LaidOutGraphNode[] } {
+  const isExpanded = expanded.has(cluster.path);
+  if (!isExpanded) {
+    return {
+      width: COLLAPSED_CLUSTER_W,
+      height: COLLAPSED_CLUSTER_H,
+      descendants: [],
+    };
+  }
+
+  // Resolve direct children.
+  const childClusters = (cluster.childClusters ?? [])
+    .map((p) => clustersByPath.get(p))
+    .filter((c): c is ClusterNode => !!c)
+    .slice()
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const childFiles = (cluster.childFiles ?? [])
+    .map((id) => filesById.get(id))
+    .filter((f): f is FileNode => !!f);
+
+  const descendants: LaidOutGraphNode[] = [];
+
+  // ------------------------------------------------------------------
+  // Sub-cluster row
+  // ------------------------------------------------------------------
+  // Recurse first so we know each sub-cluster's laid-out dimensions, then
+  // pack them grid-style. We use row-major placement with variable row
+  // heights (matches how a real tiling algorithm handles heterogeneous
+  // children when expanded siblings may be much taller than collapsed ones).
+  const subLayouts = childClusters.map((sub) => ({
+    cluster: sub,
+    ...layoutCluster(sub, clustersByPath, filesById, expanded),
+  }));
+
+  let subRowStartY = CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING;
+  let subRowX = CLUSTER_PADDING;
+  let subRowHeight = 0;
+  let subColIdx = 0;
+  let maxInnerRight = CLUSTER_PADDING;
+
+  for (const sub of subLayouts) {
+    if (subColIdx >= SUBCLUSTERS_PER_ROW) {
+      subColIdx = 0;
+      subRowX = CLUSTER_PADDING;
+      subRowStartY += subRowHeight + INNER_ROW_GAP;
+      subRowHeight = 0;
+    }
+
+    const subX = subRowX;
+    const subY = subRowStartY;
+
+    descendants.push({
+      id: sub.cluster.path,
+      kind: "cluster",
+      x: subX,
+      y: subY,
+      width: sub.width,
+      height: sub.height,
+      parent: cluster.path,
+      cluster: sub.cluster,
+      expanded: expanded.has(sub.cluster.path),
+      childCount: (sub.cluster.childFiles ?? []).length,
+    });
+    // sub.descendants are positioned relative to `sub.cluster`, so we can
+    // emit them as-is (their `parent` already points at sub.cluster.path).
+    for (const d of sub.descendants) descendants.push(d);
+
+    subRowX += sub.width + INNER_COL_GAP;
+    subRowHeight = Math.max(subRowHeight, sub.height);
+    maxInnerRight = Math.max(maxInnerRight, subX + sub.width);
+    subColIdx += 1;
+  }
+
+  // Baseline for the files row: directly below the last sub-cluster row.
+  const filesStartY =
+    subLayouts.length > 0
+      ? subRowStartY + subRowHeight + INNER_ROW_GAP
+      : CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING;
+
+  // ------------------------------------------------------------------
+  // File row
+  // ------------------------------------------------------------------
+  childFiles.forEach((f, idx) => {
+    const row = Math.floor(idx / FILES_PER_ROW);
+    const col = idx % FILES_PER_ROW;
+    const x = CLUSTER_PADDING + col * (NODE_W + INNER_COL_GAP);
+    const y = filesStartY + row * (NODE_H + INNER_ROW_GAP);
+    descendants.push({
+      id: f.id,
+      kind: "file",
+      x,
+      y,
+      width: NODE_W,
+      height: NODE_H,
+      parent: cluster.path,
+      file: f,
+    });
+    maxInnerRight = Math.max(maxInnerRight, x + NODE_W);
+  });
+
+  const fileRows = Math.ceil(childFiles.length / FILES_PER_ROW);
+  const filesBottom =
+    childFiles.length > 0
+      ? filesStartY + fileRows * NODE_H + (fileRows - 1) * INNER_ROW_GAP
+      : filesStartY - INNER_ROW_GAP; // cancel the INNER_ROW_GAP we added above
+
+  // Compute container size from laid-out descendants.
+  const minInnerWidth = FILES_PER_ROW * NODE_W + (FILES_PER_ROW - 1) * INNER_COL_GAP;
+  const innerWidth = Math.max(minInnerWidth, maxInnerRight - CLUSTER_PADDING);
+  const width = innerWidth + CLUSTER_PADDING * 2;
+  const height = filesBottom + CLUSTER_PADDING;
+
+  return { width, height, descendants };
+}
+
+/**
+ * For each file id, pre-compute the chain of cluster paths from its direct
+ * parent cluster walking up to the top level. Used for edge retargeting:
+ * we pick the FIRST path in the chain that's currently visible, so edges
+ * attach to the deepest expanded ancestor (not blindly to the top).
+ *
+ *   fileToClusterChain.get("x") = ["a/b/c", "a/b", "a"]
+ */
+function buildFileToClusterChain(
   graph: Graph,
   clusters: ClusterNode[],
-): Map<string, string> {
-  const clustersByPath = new Map<string, ClusterNode>();
-  for (const c of clusters) clustersByPath.set(c.path, c);
-
-  const topOf = (path: string): string => {
+  clustersByPath: Map<string, ClusterNode>,
+): Map<string, string[]> {
+  const chainOf = (path: string): string[] => {
+    const out: string[] = [];
     let cur: ClusterNode | undefined = clustersByPath.get(path);
-    let safety = 32;
-    while (cur && cur.parent !== null && safety > 0) {
+    let safety = 64;
+    while (cur && safety > 0) {
+      out.push(cur.path);
+      if (cur.parent === null) break;
       cur = clustersByPath.get(cur.parent);
       safety -= 1;
     }
-    return cur ? cur.path : path;
+    return out;
   };
 
-  const map = new Map<string, string>();
+  const map = new Map<string, string[]>();
   for (const cluster of clusters) {
-    const top = topOf(cluster.path);
+    const chain = chainOf(cluster.path);
     for (const fid of cluster.childFiles ?? []) {
-      map.set(fid, top);
+      map.set(fid, chain);
     }
   }
-  // Files without a cluster → top is their own folder (fallback).
+  // Files without a cluster → fall back to the first folder segment.
   for (const f of graph.files) {
     if (!map.has(f.id)) {
       const folderTop = (f.folder || "").split("/")[0] || f.folder;
-      map.set(f.id, folderTop);
+      map.set(f.id, [folderTop]);
     }
   }
   return map;
@@ -246,26 +351,38 @@ function buildFileToTopCluster(
 
 interface RetargetCtx {
   visibleIds: Set<string>;
-  fileToTopCluster: Map<string, string>;
-  expanded: Set<string>;
+  fileToClusterChain: Map<string, string[]>;
 }
 
+/**
+ * Resolve an edge endpoint to a visible node id:
+ *   1. If the endpoint itself is visible (file inside an expanded cluster, or
+ *      the cluster id itself when a sub-cluster is collapsed), use as-is.
+ *   2. Otherwise walk the file's cluster chain (deepest → topmost) and return
+ *      the first cluster path that IS visible. This is the "nearest visible
+ *      ancestor" rule that makes nested-cluster edges show up at the right
+ *      depth instead of collapsing to the top level.
+ *   3. If nothing in the chain is visible, drop the endpoint (return null).
+ */
 function retargetEndpoint(id: string, ctx: RetargetCtx): string | null {
-  // If the id is already a visible node (file or cluster), use it as-is.
   if (ctx.visibleIds.has(id)) return id;
-  // Otherwise roll up to the owning top-level cluster.
-  const topCluster = ctx.fileToTopCluster.get(id);
-  if (topCluster && ctx.visibleIds.has(topCluster)) return topCluster;
+  const chain = ctx.fileToClusterChain.get(id);
+  if (!chain) return null;
+  for (const clusterPath of chain) {
+    if (ctx.visibleIds.has(clusterPath)) return clusterPath;
+  }
   return null;
 }
 
 /**
  * Rebuild the laid-out edge list:
  *  - Drop edges with a null (unresolved) target — those render separately.
- *  - Retarget cluster-crossing endpoints to the cluster id when the file is
- *    not visible.
- *  - Aggregate multiple  (sourceCluster, targetCluster)  pairs into a single
- *    edge with a kind-breakdown tooltip (research Q9).
+ *  - Retarget cluster-crossing endpoints to the nearest visible ancestor.
+ *  - Aggregate multiple  (source, target)  pairs into a single edge with a
+ *    kind-breakdown tooltip (research Q9).
+ *  - Drop self-loops (source === target after retarget) — collapsed clusters
+ *    with purely-internal activity don't render an edge at this revision;
+ *    an "internal activity" badge is a follow-up.
  */
 function retargetEdges(
   edges: Edge[],
