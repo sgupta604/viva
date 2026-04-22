@@ -22,6 +22,7 @@ import {
 } from "@/lib/graph/cluster-layout";
 import { computeTreeLayout } from "@/lib/graph/tree-layout";
 import { edgeStyleFor } from "./EdgeStyles";
+import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
 import ClusterNode from "./ClusterNode";
 import { zoomModeFor, type ZoomMode } from "./SemanticZoom";
@@ -161,12 +162,24 @@ export function GraphCanvas() {
     return layout.edges.map((e) => {
       const style = edgeStyleFor(e.kind, !!e.unresolved);
       const isAggregated = e.count > 1;
-      const label = isAggregated ? `${e.kind} ×${e.count}` : e.kind;
+      // Q3 (research): direct edges show their kind label only on hover
+      // (the color + legend already convey the kind). Aggregated edges keep
+      // their always-on `×N` label because the count is real information
+      // that hover-to-discover would hide.
+      const label = isAggregated ? `${e.kind} ×${e.count}` : undefined;
+      const isEndpointSelected =
+        selectedFileId !== null &&
+        (e.source === selectedFileId || e.target === selectedFileId);
+      // Z-ORDER (FR7): React Flow paints edges below compound parentNode
+      // children by default. Bump zIndex so config edges stay visible
+      // crossing a cluster fill — fixes the "d-aggregate ×12 underneath
+      // parameters.d / resolve.d" symptom from image copy.png.
       return {
         id: e.id,
         source: e.source,
         target: e.target,
         type: "smoothstep",
+        zIndex: 1000,
         style: {
           ...style,
           strokeWidth: isAggregated
@@ -179,32 +192,43 @@ export function GraphCanvas() {
           unresolved: e.unresolved,
           count: e.count,
           kindBreakdown: e.kindBreakdown,
+          // Direct labels render on hover via CSS — keep the kind here so
+          // the future hover-popover or tooltip can read it without
+          // reconstructing from `data.kind`.
+          directLabel: e.kind,
         },
-        label,
+        // For non-aggregated edges with a selected endpoint we surface the
+        // kind label too (helps when the user is inspecting a file's
+        // outgoing edges). Otherwise undefined → React Flow omits the DOM.
+        label: label ?? (isEndpointSelected ? e.kind : undefined),
         labelStyle: {
           fontSize: 10,
           fill: "#d1d5db",
           fontWeight: 500,
-          // Subtle stroke-outline on the text so a glyph that peeks past
-          // the opaque background still reads cleanly against a cluster
-          // border underneath (polish for edge-label-over-cluster mud).
+          // Stroke-outline so glyphs read cleanly even if a cluster border
+          // peeks through the background.
           paintOrder: "stroke",
           stroke: "#0a0a0a",
           strokeWidth: 2,
           strokeLinejoin: "round",
+          // pointer-events:none so a label can never steal hover from the
+          // edge or a node it overlays.
+          pointerEvents: "none",
         },
         labelShowBg: true,
         // Opaque near-black background with generous padding + rounded
         // corners so the label stands proud of whatever cluster border
-        // happens to sit underneath. Without this, a label like
-        // "logical-id ×2" can paint over a sibling cluster's corner and
-        // produce a visual smudge.
-        labelBgStyle: { fill: "#0a0a0a", fillOpacity: 1 },
+        // happens to sit underneath.
+        labelBgStyle: {
+          fill: "#0a0a0a",
+          fillOpacity: 1,
+          pointerEvents: "none",
+        },
         labelBgPadding: [10, 6] as [number, number],
         labelBgBorderRadius: 6,
       };
     });
-  }, [layout]);
+  }, [layout, selectedFileId]);
 
   if (!filtered || !layout) return null;
 
@@ -239,6 +263,7 @@ export function GraphCanvas() {
         <Background gap={16} color="#1f2937" />
         <Controls showInteractive={false} />
       </ReactFlow>
+      <EdgeLegend />
       <div
         data-testid="readonly-hint"
         title="The graph reflects parsed code. Editing modes are not yet available."

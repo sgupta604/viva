@@ -39,3 +39,23 @@ When reopened, diff `base_graph` against the current live graph and surface drif
 **Why.** A delta-only model can't reconstruct what the world looked like when the plan was designed if the underlying code drifts. Saving the base enables real reconciliation rather than silent invalidation. User locked in this answer during the Plan Mode design discussion — do not re-litigate.
 
 **How to apply.** When `/research plan-mode` runs, this is the answer to the data-model question. Storage, diff, and reconciliation design should work backwards from this shape. Plan files are JSON artifacts (no DB in v1).
+
+---
+
+## 2026-04-22 — elkjs promoted from skeleton to primary layout engine (tree mode)
+
+**Decision.** `elkjs` (already bundled, sitting unused as `computeElkLayout` skeleton in `viewer/src/lib/graph/layout.worker.ts`) is now the production layout engine for the new tree mode. Algorithm: `mrtree` with `elk.direction = RIGHT`. Cluster mode keeps its synchronous recursive grid-pack in `cluster-layout.ts`.
+
+**Why.** The 3k-node grid-pack passed the FPS gate only because it was O(n) trivial math, not because it produced a real hierarchical layout. A true dendrogram needs proper hierarchical placement. `mrtree` was chosen over `layered` for the dendrogram aesthetic the user's reference image shows — fanned-out children, orthogonal connectors, no Sugiyama-style horizontal layering. `mrtree` also ignores non-tree edges for layout purposes, which is the correct behavior because we draw config edges (`include`, `ref`, `xsd`, `logical-id`, `d-aggregate`) as overlays on top of the structural backbone.
+
+**How to apply.** New tree-shape features call `computeTreeLayout(graph, expanded)` from `lib/graph/tree-layout.ts`. The worker path runs through `new Worker(new URL("./layout.worker.ts", ...), { type: "module" })`; the same module's `computeElkLayout` export is the main-thread fallback for jsdom tests. LRU cache size 8, keyed by `(graphHash, expandedHash)` — pan/zoom never re-runs layout. If a future mode wants Sugiyama-style compact width, pass `{ algorithm: "layered" }` to `computeElkLayout`; both paths are wired.
+
+---
+
+## 2026-04-22 — Tree mode is the default; cluster (box-inside-box) is a toggle
+
+**Decision.** Graph view default-on-load is the new horizontal `mrtree` dendrogram. The existing cluster-box layout (`computeClusterLayout`) becomes an opt-in toggle in `ViewModeBar`'s graph-mode-only sub-toggle. Persisted per browser via `localStorage["viva.viewStore.graphLayout"]`.
+
+**Why.** Direct user feedback during research: "the box inside box is nice but set it as a toggle." A horizontal tree communicates parent/child relationships at first glance more legibly than nested boxes do at 3k-file scale. Cluster mode is preserved (not deleted) because the user explicitly likes it for inspection of a focused subtree.
+
+**How to apply.** Any new viewer feature that needs to know which layout is active reads `useViewStore.graphLayout` (`"tree" | "clusters"`). New visual features should be tested in BOTH modes — they share node atoms (`FileNode`, `ClusterNode`) and the same `hierarchyStore.expanded` set, so toggling between them must not reset state. Default for new installs: tree.
