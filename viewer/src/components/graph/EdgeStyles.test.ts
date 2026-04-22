@@ -11,6 +11,9 @@ import {
   crossRefOpacityFor,
   CROSSREF_DIM_OPACITY,
   CROSSREF_FULL_OPACITY,
+  crossRefInteractionWidthFor,
+  CROSSREF_INTERACTION_WIDTH_DIMMED,
+  CROSSREF_INTERACTION_WIDTH_FOCUSED,
 } from "./EdgeStyles";
 import type { EdgeKind } from "@/lib/graph/types";
 
@@ -224,6 +227,96 @@ describe("crossRefOpacityFor (focus + context dimming)", () => {
     // single deliberate test edit, not a silent UX shift.
     expect(CROSSREF_DIM_OPACITY).toBe(0.15);
     expect(CROSSREF_FULL_OPACITY).toBe(1);
+  });
+});
+
+describe("crossRefInteractionWidthFor (hit-target tracks visible opacity)", () => {
+  // INVARIANT LOCK: the React Flow `interactionWidth` for a cross-ref edge
+  // MUST shrink to 0 whenever the same edge would dim (per
+  // crossRefOpacityFor). Before this lock, the 20px-wide invisible
+  // `react-flow__edge-interaction` overlay kept eating pointer events for
+  // dimmed edges — silently breaking node-hover the focus+context fix was
+  // designed to enable. The two helpers MUST stay in lockstep.
+
+  it("drops cross-ref hit-zone to 0 in flat mode when nothing is focused", () => {
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(crossRefInteractionWidthFor(k, true, false)).toBe(
+        CROSSREF_INTERACTION_WIDTH_DIMMED,
+      );
+    }
+  });
+
+  it("restores cross-ref hit-zone to 20 in flat mode when focused", () => {
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(crossRefInteractionWidthFor(k, true, true)).toBe(
+        CROSSREF_INTERACTION_WIDTH_FOCUSED,
+      );
+    }
+  });
+
+  it("never collapses hierarchy (d-aggregate) hit-zone in any mode", () => {
+    // d-aggregate edges never dim, so they must never lose their hit-zone.
+    expect(crossRefInteractionWidthFor("d-aggregate", true, false)).toBe(
+      CROSSREF_INTERACTION_WIDTH_FOCUSED,
+    );
+    expect(crossRefInteractionWidthFor("d-aggregate", true, true)).toBe(
+      CROSSREF_INTERACTION_WIDTH_FOCUSED,
+    );
+    expect(crossRefInteractionWidthFor("d-aggregate", false, false)).toBe(
+      CROSSREF_INTERACTION_WIDTH_FOCUSED,
+    );
+  });
+
+  it("never collapses hit-zone in cluster mode (no dimming there)", () => {
+    for (const k of [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "logical-id",
+      "d-aggregate",
+    ] as const) {
+      expect(crossRefInteractionWidthFor(k, false, false)).toBe(
+        CROSSREF_INTERACTION_WIDTH_FOCUSED,
+      );
+      expect(crossRefInteractionWidthFor(k, false, true)).toBe(
+        CROSSREF_INTERACTION_WIDTH_FOCUSED,
+      );
+    }
+  });
+
+  it("focused-width matches the React Flow default (20)", () => {
+    // Lock the constant so future React Flow upgrades that change the
+    // default surface here as a single deliberate edit rather than a
+    // silent UX shift.
+    expect(CROSSREF_INTERACTION_WIDTH_FOCUSED).toBe(20);
+    expect(CROSSREF_INTERACTION_WIDTH_DIMMED).toBe(0);
+  });
+
+  it("hit-zone collapses iff opacity dims (lockstep with crossRefOpacityFor)", () => {
+    // The two helpers MUST agree. If a future change relaxes the dim rules
+    // in one without the other, the hit-zone could outlive the visual
+    // dim and re-introduce the original bug.
+    for (const k of [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "logical-id",
+      "d-aggregate",
+    ] as const) {
+      for (const isFlat of [true, false] as const) {
+        for (const isFocused of [true, false] as const) {
+          const opacity = crossRefOpacityFor(k, isFlat, isFocused);
+          const width = crossRefInteractionWidthFor(k, isFlat, isFocused);
+          if (opacity === CROSSREF_DIM_OPACITY) {
+            expect(width).toBe(CROSSREF_INTERACTION_WIDTH_DIMMED);
+          } else {
+            expect(width).toBe(CROSSREF_INTERACTION_WIDTH_FOCUSED);
+          }
+        }
+      }
+    }
   });
 });
 

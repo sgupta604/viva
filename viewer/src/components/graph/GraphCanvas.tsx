@@ -27,6 +27,7 @@ import {
   shouldDisablePointerEvents,
   treeEdgeStyleFor,
   crossRefOpacityFor,
+  crossRefInteractionWidthFor,
 } from "./EdgeStyles";
 import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
@@ -314,6 +315,19 @@ export function GraphCanvas() {
         focusedNodeId !== null &&
         (e.source === focusedNodeId || e.target === focusedNodeId);
       const opacity = crossRefOpacityFor(e.kind, isFlatMode, isFocused);
+      // Hit-target width must shrink in lockstep with the visible opacity
+      // (user QA 2026-04-22): React Flow's invisible 20px-wide
+      // `react-flow__edge-interaction` overlay was eating pointer events for
+      // cross-ref edges that were dimmed to 0.15 — making it impossible to
+      // hover the file behind a faint edge. The focus+context fix worked
+      // visually but quietly broke the hover affordance it was designed to
+      // restore. Mirror crossRefOpacityFor's exemptions here so an edge that
+      // can't dim never loses its hit-zone.
+      const interactionWidth = crossRefInteractionWidthFor(
+        e.kind,
+        isFlatMode,
+        isFocused,
+      );
       // Bezier curves for cross-ref edges in flat modes (Change 2): the
       // smoothstep orthogonal routing inherited from elkjs's mrtree was the
       // visual culprit behind images #13/#14 — straight horizontal/vertical
@@ -328,6 +342,7 @@ export function GraphCanvas() {
         target: e.target,
         type: useBezier ? "default" : "smoothstep",
         zIndex: 1000,
+        interactionWidth,
         style: {
           ...style,
           strokeWidth: isAggregated

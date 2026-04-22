@@ -177,6 +177,44 @@ export function crossRefOpacityFor(
 }
 
 /**
+ * Hit-target width for an edge's invisible interaction layer (React Flow's
+ * `interactionWidth` prop — defaults to 20px). When a cross-ref edge is
+ * dimmed to 0.15 opacity in a flat layout, its visible stroke is barely
+ * perceptible but the 20px-wide interaction overlay still intercepts every
+ * pointer event passing through it. That broke node-hover the user expects:
+ * trying to hover a file behind a faint edge silently failed because the
+ * edge's hit-zone ate the move.
+ *
+ * Fix: when the edge is dimmed, drop its interaction width to 0. The visible
+ * path stays drawn (so the dim hint of "there's a connection here" persists),
+ * but it stops swallowing pointer events. The moment the edge is focused
+ * (hover/select on either endpoint) it returns to the default 20px hit-zone
+ * so the user can click the now-bright edge to inspect it.
+ *
+ * Cluster mode and hierarchy edges are unaffected — they never dim in the
+ * first place, so their hit-target stays at the React Flow default.
+ *
+ * Pure helper, exported for the GraphCanvas edge mapper AND for tests.
+ */
+export const CROSSREF_INTERACTION_WIDTH_FOCUSED = 20;
+export const CROSSREF_INTERACTION_WIDTH_DIMMED = 0;
+
+export function crossRefInteractionWidthFor(
+  kind: EdgeKind,
+  isFlatMode: boolean,
+  isFocused: boolean,
+): number {
+  // Mirror crossRefOpacityFor's exemption rules so the two stay in lockstep:
+  // an edge that doesn't dim must keep its hit-zone, otherwise we'd silently
+  // make permanently-bright edges unclickable.
+  if (!isFlatMode) return CROSSREF_INTERACTION_WIDTH_FOCUSED;
+  if (kind === "d-aggregate") return CROSSREF_INTERACTION_WIDTH_FOCUSED;
+  return isFocused
+    ? CROSSREF_INTERACTION_WIDTH_FOCUSED
+    : CROSSREF_INTERACTION_WIDTH_DIMMED;
+}
+
+/**
  * 2-row legend metadata for tree mode. Keeps the same `EdgeKindMeta` shape
  * the legend already iterates over (label + color + strokeWidth), so the
  * EdgeLegend component can switch arrays without restructuring its JSX.
