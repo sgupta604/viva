@@ -37,6 +37,7 @@ const KIND_DOT: Record<string, string> = {
 function TreeFileNodeInner({ data, selected }: Props) {
   const f = data.file;
   const selectedParamKey = useSelectionStore((s) => s.selectedParamKey);
+  const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
   const graph = useGraphStore((s) => s.graph);
 
   let highlight: "strong" | "muted" | null = null;
@@ -46,6 +47,15 @@ function TreeFileNodeInner({ data, selected }: Props) {
     else if (h.nameMatch.has(f.id)) highlight = "muted";
   }
 
+  // Hover affordance (Change 4, user feedback 2026-04-22): when the user
+  // hovers this card, brighten its border slightly so they get a clear
+  // visual confirmation that "this hover IS what's lighting up the cross-
+  // ref edges." Sky-300 (TREE_CROSSREF_COLOR) at 60% so it reads as a soft
+  // accent — not loud enough to compete with the selected-blue ring or the
+  // amber param-highlight. Selection / param-highlight rings still win
+  // because they convey strictly more state than hover.
+  const isHovered = hoveredNodeId === f.id;
+
   const ring =
     highlight === "strong"
       ? "ring-2 ring-amber-400"
@@ -53,10 +63,21 @@ function TreeFileNodeInner({ data, selected }: Props) {
         ? "ring-1 ring-amber-400/40"
         : selected
           ? "ring-2 ring-blue-400"
-          : "";
+          : isHovered
+            ? "ring-1 ring-sky-300/60"
+            : "";
 
   // Light-blue fill for leaf files matches the reference image's leaf
   // styling. `generated` files dim slightly so the synthetic ones recede.
+  //
+  // Background: changed from `bg-sky-950/60` (60% alpha) to opaque
+  // `bg-sky-950` (Change 3, user feedback 2026-04-22). The translucent
+  // background let cross-ref edge SVG paths bleed through the file-name
+  // text — Image #14 had a cyan line literally cutting through the word
+  // "dangling". Even though the node sits at zIndex 1100 above the edge
+  // layer (1000), a translucent fill means the SVG underneath shows
+  // through the rendered text. Opaque fill paired with the existing
+  // zIndex bump fully resolves the readability issue.
   const generatedClass = f.generated ? "opacity-70" : "";
   const parseFailClass = f.parseError ? "ring-1 ring-red-500/60" : "";
 
@@ -69,7 +90,7 @@ function TreeFileNodeInner({ data, selected }: Props) {
       data-tree-file="true"
       data-generated={f.generated ? "true" : undefined}
       style={{ width: TREE_FILE_W, height: TREE_FILE_H }}
-      className={`flex items-center gap-2 rounded-md border border-sky-700/50 bg-sky-950/60 px-2.5 py-1 text-left shadow-sm transition ${ring} ${generatedClass} ${parseFailClass}`}
+      className={`flex items-center gap-2 rounded-md border border-sky-700/50 bg-sky-950 px-2.5 py-1 text-left shadow-sm transition ${ring} ${generatedClass} ${parseFailClass}`}
     >
       <Handle
         type="target"

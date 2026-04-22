@@ -27,6 +27,7 @@
 import { memo, type KeyboardEvent } from "react";
 import { Handle, Position } from "reactflow";
 import { useHierarchyStore } from "@/lib/state/hierarchy-store";
+import { useSelectionStore } from "@/lib/state/selection-store";
 import type { ClusterNode as ClusterNodeData } from "@/lib/graph/types";
 import { TREE_FOLDER_W, TREE_FOLDER_H } from "@/lib/graph/layout";
 
@@ -46,6 +47,7 @@ function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
   const { cluster, expanded, childCount } = data;
   const expand = useHierarchyStore((s) => s.expand);
   const collapse = useHierarchyStore((s) => s.collapse);
+  const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
 
   const isDAggregate = cluster.kind === "d-aggregate";
   const displayLabel = cluster.path.split("/").pop() || cluster.path;
@@ -65,6 +67,15 @@ function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
   // for d-aggregate so the synthetic .d/ aggregation reads as distinct.
   const borderStyle = isDAggregate ? "border-dashed" : "border-solid";
 
+  // Hover affordance (Change 4, user feedback 2026-04-22): brighten the
+  // border in the cross-ref accent color when the user hovers the folder
+  // so they get a visual confirmation that THIS hover is what's lighting
+  // up the connected cross-ref edges. Subtle (1px ring at 60% alpha) so it
+  // doesn't compete with the existing hover:bg-neutral-700 background
+  // shift or get loud against the dim default state of unfocused edges.
+  const isHovered = hoveredNodeId === cluster.path;
+  const hoverRing = isHovered ? "ring-1 ring-sky-300/60" : "";
+
   return (
     <div
       role="button"
@@ -80,7 +91,7 @@ function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
       onClick={onToggle}
       onKeyDown={onKey}
       style={{ width: TREE_FOLDER_W, height: TREE_FOLDER_H }}
-      className={`flex cursor-pointer items-center gap-2 rounded-md border ${borderStyle} border-neutral-600 bg-neutral-800 px-2.5 py-1 text-left shadow-sm transition hover:bg-neutral-700`}
+      className={`flex cursor-pointer items-center gap-2 rounded-md border ${borderStyle} border-neutral-600 bg-neutral-800 px-2.5 py-1 text-left shadow-sm transition hover:bg-neutral-700 ${hoverRing}`}
     >
       <Handle
         type="target"
