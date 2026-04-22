@@ -64,7 +64,11 @@ export function GraphCanvas() {
           markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
           data: { kind: e.kind, unresolved: e.unresolved },
           label: e.kind,
-          labelStyle: { fontSize: 10, fill: "#9ca3af" },
+          labelStyle: { fontSize: 10, fill: "#d1d5db", fontWeight: 500 },
+          labelShowBg: true,
+          labelBgStyle: { fill: "#0a0a0a", fillOpacity: 0.95 },
+          labelBgPadding: [6, 3] as [number, number],
+          labelBgBorderRadius: 3,
         };
       });
   }, [layout]);

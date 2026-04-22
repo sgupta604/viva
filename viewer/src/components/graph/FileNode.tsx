@@ -60,7 +60,7 @@ function FileNodeInner({ data, selected }: Props) {
           {f.kind}
         </span>
       </div>
-      <div className="truncate text-xs text-neutral-500">{f.folder || "/"}</div>
+      <div className="truncate px-1.5 pt-0.5 text-xs text-neutral-500">{f.folder || "/"}</div>
       {f.parseError && (
         <div className="mt-1 truncate text-[10px] text-red-400" title={f.parseError}>
           parse error
