@@ -55,6 +55,11 @@ class FileNode:
     # v2 additions — opt-in templating-manifest flagging.
     generated: bool = False
     generated_from: Optional[str] = None
+    # v2 sidecar — logical-ID declarations this file makes. Not emitted to the
+    # graph.json output (no field in spec). Used only by refs.py to index
+    # cross-file logical-id edges. `set` keeps membership O(1); resolver
+    # sorts before linking so edge order is deterministic.
+    logical_id_declarations: set[str] = field(default_factory=set)
 
     def to_dict(self) -> dict:
         return {

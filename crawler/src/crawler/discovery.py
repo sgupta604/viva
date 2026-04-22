@@ -11,7 +11,7 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Iterator, Optional
 
-SUPPORTED_EXTS = {".xml", ".yaml", ".yml", ".json", ".ini", ".cfg"}
+SUPPORTED_EXTS = {".xml", ".xsd", ".yaml", ".yml", ".json", ".ini", ".cfg"}
 
 # Heavy/uninteresting directory names that should be pruned at walk-time so we
 # never `stat` their contents. Matched by name anywhere in the tree.

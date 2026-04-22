@@ -19,6 +19,12 @@ ParseFn = Callable[[Path, str], FileNode]
 
 _EXT_TO_PARSER: dict[str, tuple[FileKind, ParseFn]] = {
     ".xml": ("xml", xml_parser.parse),
+    # XSD is an XML document; route through the xml parser so xsi:* attrs on
+    # consumers resolve to the .xsd file as a graph node. kind stays "xml" —
+    # v2 schema keeps FileKind a closed 4-enum to avoid a cascading
+    # FileNode.kind change across the viewer. Distinguish XSD visually later
+    # via the file extension, not a new FileKind.
+    ".xsd": ("xml", xml_parser.parse),
     ".yaml": ("yaml", yaml_parser.parse),
     ".yml": ("yaml", yaml_parser.parse),
     ".json": ("json", json_parser.parse),
