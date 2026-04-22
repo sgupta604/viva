@@ -31,6 +31,7 @@ def crawl(
     from .discovery import discover
     from .parsers import parse_file
     from .refs import resolve_references
+    from .templating import mark_generated_from_manifests
 
     root_path = Path(root).resolve()
     discovered = list(
@@ -62,6 +63,10 @@ def crawl(
     # doing it here means `files` in the returned Graph is already stable,
     # which the parallel-determinism test relies on.
     files.sort(key=lambda f: f.path)
+
+    # v2: opt-in templating-manifest detection — flags matched files
+    # generated=True. No-op when no manifest exists. Mutates files in-place.
+    mark_generated_from_manifests(files, root_path)
 
     # v2: build ClusterNode[] from file paths + pair `.d/` dirs with sibling
     # files. Cluster build is pure; sidecar edges (d-aggregate) are merged with
