@@ -7,9 +7,11 @@ Claude Code development pipeline for **viva**, a local, offline config-codebase 
 viva crawls a config-heavy codebase (XML / YAML / JSON / INI) and serves an
 interactive viewer for the graph of files and cross-references. Offline,
 local-only, no telemetry. One command to run it against any codebase:
-
+(second one is to pull latest from main)
 ```bash
 docker run --rm -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
+
+docker run --pull=always --rm -v "$(pwd):/target:ro" -p 5173:5173 ghcr.io/sgupta604/viva
 ```
 
 Open <http://localhost:5173> in your browser.
