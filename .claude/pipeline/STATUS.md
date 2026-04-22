@@ -21,7 +21,7 @@ _(empty)_
 
 | Feature | Date | PR / Merge |
 |---------|------|----|
-| large-codebase-viewer | 2026-04-22 | PR open on feat/large-codebase-viewer (22 commits); user reviews and merges |
+| large-codebase-viewer | 2026-04-22 | [PR #1](https://github.com/sgupta604/viva/pull/1) open (22 commits); user reviews and merges |
 | xml-viewer-hardening | 2026-04-21 | merged to main (fast-forward, 14 commits, tip `d1ed38b`) |
 | v1-demo | 2026-04-18 | merged to main |
 | runtime-image | 2026-04-18 | merged to main |
