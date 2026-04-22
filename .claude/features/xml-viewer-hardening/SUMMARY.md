@@ -97,3 +97,19 @@ Parse-error baseline: 3 (intentional broken.xml copies). Unchanged after xi-incl
 - Task granularity: right -- F/C/V streams parallelized well; I-stream serial gate worked as intended.
 - Estimate accuracy: 22 of 23 plan tasks complete before /test; I.3 deferred to /test by design.
 - Agent delegation: Sub-agent tool unavailable in this environment; execute-agent handled all streams directly following frontend/backend conventions. Stream separation kept work organized.
+
+## Post-Finalize Fixes
+
+Three bugs surfaced during user visual review of the PR branch (dogfooding against viva itself on a Coder instance). Caught before merge to main; all tests added as regressions.
+
+| Commit | Fix | Root Cause |
+|--------|-----|-----------|
+| 02c8a2a | fix(viewer): isolate edge labels from node borders and pad node path text | Edge label pills had transparent backgrounds → clipped under adjacent node borders on short edges. Added opaque `labelBgStyle` + padding in GraphCanvas; added `px-1.5 pt-0.5` inset on FileNode path line. |
+| dd2f273 | fix(crawler): exclude --emit-sources output subtree from walk | C.5 flipped `--emit-sources` default-on but the walker didn't know to exclude the output mirror dir. Re-crawling the same repo picked up prior-run sidecars as first-class files → nested duplicate nodes (`viewer/public/source/viewer/public/source/...`). Now CLI computes the sidecar dir at startup and adds it to the walker's excludes. New `test_emit_sources_no_self_feedback` integration test crawls three times and asserts stability from run 2 onward. |
+| 26f948f | fix(viewer): pin FileNode width to dagre layout constant | `FileNode.tsx` used `min-w-[200px]` with no max, while `layout.ts` reserved fixed `NODE_W = 224` for dagre. Long folder-path text stretched the DOM node past 224 → overlap with neighbor. Exported `NODE_W` from layout.ts, applied via inline style, added `truncate` + `title` for hover reveal. New FileNode.test.tsx asserts width and truncation. |
+
+### Post-Finalize Lessons
+
+- Dogfood integration test ran crawler exactly once — missed the re-crawl feedback loop. Follow-up integration tests should exercise re-entrant operations (crawl twice, build twice) for anything that emits into the scan tree.
+- Graph layout work needs fixed-dimension invariants documented at a single source of truth (now `NODE_W` export) rather than duplicated in CSS + TS.
+- The `parse_error` vs `parseError` schema key (camelCase, per `FileNode.to_dict`) is worth highlighting in future docs — briefly caused a false-alarm "parse_errors: 0" diagnosis before the key was corrected. Graph schema doc should include a key reference table.

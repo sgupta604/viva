@@ -6,9 +6,9 @@
 
 | Field | Value |
 |-------|-------|
-| Feature | — idle — |
-| Phase | — |
-| Next | — |
+| Feature | xml-viewer-hardening |
+| Phase | post-diagnose-fix-applied |
+| Next | Awaiting user eyeball on `feat/xml-viewer-hardening` (pushed). Two new commits: `dd2f273 fix(crawler): exclude --emit-sources output subtree from walk` + `26f948f fix(viewer): pin FileNode width to dagre layout constant`. Crawler 69/69 green (incl. new twice-crawl regression test), viewer 50/50 green (incl. new FileNode width test), lint/typecheck/build clean. After user confirms the graph looks clean, they merge the PR. |
 
 ## Reminders (surface when user returns)
 
