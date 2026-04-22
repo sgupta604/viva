@@ -100,7 +100,8 @@ def test_cli_smoke(sample_module: Path, tmp_path: Path):
     assert result.returncode == 0, result.stderr
     assert out.exists()
     data = json.loads(out.read_text(encoding="utf-8"))
-    assert data["version"] == 1
+    assert data["version"] == 2
+    assert "clusters" in data  # v2 always emits the clusters array
     assert len(data["files"]) > 0
 
 

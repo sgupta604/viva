@@ -62,11 +62,14 @@ def crawl(
     files.sort(key=lambda f: f.path)
 
     edges = resolve_references(files)
+    # clusters[] is populated in C.2 (clusters.py). Until then this foundation
+    # emission ships an empty clusters[] — the v2 shape is contract-complete
+    # but structurally a no-op on the viewer side (same cluster count as v1).
     return Graph(
-        version=1,
         root=root_path.name or str(root_path),
         files=files,
         edges=edges,
+        clusters=[],
         generated_at=None if no_timestamp else _utc_now(),
     )
 

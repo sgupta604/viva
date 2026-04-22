@@ -1,4 +1,5 @@
 {
+  "clusters": [],
   "edges": [
     {
       "kind": "include",
@@ -58,6 +59,8 @@
   "files": [
     {
       "folder": "config",
+      "generated": false,
+      "generatedFrom": null,
       "id": "5b29ae138c",
       "isTest": false,
       "kind": "xml",
@@ -76,6 +79,8 @@
     },
     {
       "folder": "config",
+      "generated": false,
+      "generatedFrom": null,
       "id": "4f22226ced",
       "isTest": false,
       "kind": "xml",
@@ -94,6 +99,8 @@
     },
     {
       "folder": "config",
+      "generated": false,
+      "generatedFrom": null,
       "id": "9de5937c64",
       "isTest": false,
       "kind": "xml",
@@ -118,6 +125,8 @@
     },
     {
       "folder": "config",
+      "generated": false,
+      "generatedFrom": null,
       "id": "aa9b318519",
       "isTest": false,
       "kind": "xml",
@@ -136,6 +145,8 @@
     },
     {
       "folder": "config",
+      "generated": false,
+      "generatedFrom": null,
       "id": "871f03cc34",
       "isTest": false,
       "kind": "xml",
@@ -166,6 +177,8 @@
     },
     {
       "folder": "config",
+      "generated": false,
+      "generatedFrom": null,
       "id": "3bb919257a",
       "isTest": false,
       "kind": "xml",
@@ -184,6 +197,8 @@
     },
     {
       "folder": "dangling",
+      "generated": false,
+      "generatedFrom": null,
       "id": "67e3e791a0",
       "isTest": false,
       "kind": "xml",
@@ -195,6 +210,8 @@
     },
     {
       "folder": "environments",
+      "generated": false,
+      "generatedFrom": null,
       "id": "d1efb571e6",
       "isTest": false,
       "kind": "json",
@@ -219,6 +236,8 @@
     },
     {
       "folder": "environments",
+      "generated": false,
+      "generatedFrom": null,
       "id": "c7a17124c1",
       "isTest": false,
       "kind": "json",
@@ -249,6 +268,8 @@
     },
     {
       "folder": "pipelines",
+      "generated": false,
+      "generatedFrom": null,
       "id": "c18e30ff08",
       "isTest": false,
       "kind": "yaml",
@@ -309,6 +330,8 @@
     },
     {
       "folder": "pipelines",
+      "generated": false,
+      "generatedFrom": null,
       "id": "0791a5826a",
       "isTest": false,
       "kind": "yaml",
@@ -339,6 +362,8 @@
     },
     {
       "folder": "pipelines",
+      "generated": false,
+      "generatedFrom": null,
       "id": "da2e3cd57e",
       "isTest": false,
       "kind": "yaml",
@@ -375,6 +400,8 @@
     },
     {
       "folder": "shared",
+      "generated": false,
+      "generatedFrom": null,
       "id": "9a1f9f334d",
       "isTest": false,
       "kind": "xml",
@@ -399,6 +426,8 @@
     },
     {
       "folder": "shared",
+      "generated": false,
+      "generatedFrom": null,
       "id": "4012898dc0",
       "isTest": false,
       "kind": "json",
@@ -429,6 +458,8 @@
     },
     {
       "folder": "tests",
+      "generated": false,
+      "generatedFrom": null,
       "id": "471ff263d6",
       "isTest": true,
       "kind": "yaml",
@@ -453,6 +484,8 @@
     },
     {
       "folder": "tests",
+      "generated": false,
+      "generatedFrom": null,
       "id": "3600ae033d",
       "isTest": true,
       "kind": "xml",
@@ -471,6 +504,8 @@
     },
     {
       "folder": "thresholds",
+      "generated": false,
+      "generatedFrom": null,
       "id": "df38e08330",
       "isTest": false,
       "kind": "ini",
@@ -501,6 +536,8 @@
     },
     {
       "folder": "thresholds",
+      "generated": false,
+      "generatedFrom": null,
       "id": "b8b434c85a",
       "isTest": false,
       "kind": "ini",
@@ -531,5 +568,5 @@
     }
   ],
   "root": "sample-module",
-  "version": 1
+  "version": 2
 }
