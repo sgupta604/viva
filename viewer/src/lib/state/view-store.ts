@@ -14,12 +14,25 @@ export type SortBy = "name" | "path" | "size" | "refCount" | "parseStatus";
 export type SortDir = "asc" | "desc";
 
 /**
- * v3 — graph-mode-only sub-toggle: dendrogram vs. cluster-box layout.
- * Default `"tree"` (research §Goal: tree as default; clusters as opt-in).
- * Persisted under a versioned localStorage key so a future schema change
- * can rev the suffix without colliding with stored values from old shapes.
+ * v3 — graph-mode-only sub-toggle: which layout drives the graph canvas.
+ *
+ * Three options after the dendrogram continuation (2026-04-22):
+ *   - `dendrogram` — flat folder/file labels with drawn orthogonal hierarchy
+ *     edges (matches the user's reference image). NEW DEFAULT.
+ *   - `tree`       — original v3 mrtree-on-cluster-containment-boxes layout.
+ *     Kept for layout-comparison value on real codebases.
+ *   - `clusters`   — recursive box-in-box compound nodes. Original v2 layout.
+ *
+ * Persisted under a versioned localStorage key so a future schema change can
+ * rev the suffix without colliding with stored values from old shapes.
+ *
+ * Migration: existing `tree` / `clusters` values stored from prior sessions
+ * still rehydrate (the read guard accepts all three values). Only NEW users
+ * with no stored value get the `dendrogram` default — that respects an
+ * existing user's deliberate choice while making dendrogram the
+ * out-of-the-box experience.
  */
-export type GraphLayout = "tree" | "clusters";
+export type GraphLayout = "dendrogram" | "tree" | "clusters";
 
 const GRAPH_LAYOUT_STORAGE_KEY = "viva.viewStore.graphLayout";
 const LEGEND_COLLAPSED_STORAGE_KEY = "viva.viewStore.legendCollapsed";
@@ -32,7 +45,9 @@ function readGraphLayout(): GraphLayout | undefined {
   if (typeof window === "undefined") return undefined;
   try {
     const raw = window.localStorage.getItem(GRAPH_LAYOUT_STORAGE_KEY);
-    if (raw === "tree" || raw === "clusters") return raw;
+    // Accept all three valid values. `tree` and `clusters` keep working for
+    // users who already chose them in a prior session — we don't migrate.
+    if (raw === "dendrogram" || raw === "tree" || raw === "clusters") return raw;
   } catch {
     // localStorage may throw in strict private modes — silently fall back.
   }
@@ -92,7 +107,9 @@ export const useViewStore = create<ViewState>((set, get) => ({
   viewMode: "graph",
   sortBy: "path",
   sortDir: "asc",
-  graphLayout: readGraphLayout() ?? "tree",
+  // New-user default flipped from `tree` → `dendrogram` (2026-04-22). Stored
+  // values for `tree` / `clusters` still rehydrate above.
+  graphLayout: readGraphLayout() ?? "dendrogram",
   legendCollapsed: readLegendCollapsed() ?? false,
   setViewMode: (m) => set({ viewMode: m }),
   setSort: (by, dir) => {

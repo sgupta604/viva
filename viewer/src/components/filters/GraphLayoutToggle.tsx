@@ -1,7 +1,14 @@
 /**
- * Graph-mode-only sub-toggle: Tree (mrtree dendrogram) vs. Clusters
- * (box-inside-box). Mounted by ViewModeBar only when `viewMode === "graph"`
- * — folders/table modes don't have a layout choice.
+ * Graph-mode-only sub-toggle: which layout drives the canvas. Mounted by
+ * ViewModeBar only when `viewMode === "graph"` — folders/table modes don't
+ * have a layout choice.
+ *
+ * Three pills (2026-04-22 dendrogram continuation):
+ *   - Dendrogram (default) — flat folder/file labels, drawn hierarchy edges,
+ *     matches the user's reference image
+ *   - Tree                 — original mrtree-on-cluster-containment layout;
+ *     kept for layout-comparison value on real codebases
+ *   - Clusters             — recursive box-in-box compound nodes
  *
  * Pill styling matches the existing view-mode pill so the chrome reads as
  * one cohesive bar (active = bg-neutral-800 text-neutral-100; inactive =
@@ -11,6 +18,7 @@
 import { useViewStore, type GraphLayout } from "@/lib/state/view-store";
 
 const LAYOUTS: { id: GraphLayout; label: string }[] = [
+  { id: "dendrogram", label: "Dendrogram" },
   { id: "tree", label: "Tree" },
   { id: "clusters", label: "Clusters" },
 ];

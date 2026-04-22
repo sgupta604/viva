@@ -13,7 +13,7 @@ describe("view store", () => {
       viewMode: "graph",
       sortBy: "path",
       sortDir: "asc",
-      graphLayout: "tree",
+      graphLayout: "dendrogram",
       legendCollapsed: false,
     });
     window.localStorage.removeItem(GRAPH_LAYOUT_STORAGE_KEY);
@@ -65,8 +65,8 @@ describe("view store", () => {
   // graphLayout (v3 — tree-layout-redesign)
   // ------------------------------------------------------------------
 
-  it("defaults graphLayout to tree", () => {
-    expect(useViewStore.getState().graphLayout).toBe("tree");
+  it("defaults graphLayout to dendrogram for new users (no stored value)", () => {
+    expect(useViewStore.getState().graphLayout).toBe("dendrogram");
   });
 
   it("setGraphLayout updates the layout and writes through to localStorage", () => {
@@ -77,9 +77,13 @@ describe("view store", () => {
     useViewStore.getState().setGraphLayout("tree");
     expect(useViewStore.getState().graphLayout).toBe("tree");
     expect(window.localStorage.getItem(GRAPH_LAYOUT_STORAGE_KEY)).toBe("tree");
+
+    useViewStore.getState().setGraphLayout("dendrogram");
+    expect(useViewStore.getState().graphLayout).toBe("dendrogram");
+    expect(window.localStorage.getItem(GRAPH_LAYOUT_STORAGE_KEY)).toBe("dendrogram");
   });
 
-  it("rehydrates graphLayout from localStorage on store init", async () => {
+  it("rehydrates stored `clusters` value on store init", async () => {
     // Simulate a stored value, then re-import the module to trigger a fresh
     // create() call. We use vi.resetModules so the lazy module is re-evaluated.
     window.localStorage.setItem(GRAPH_LAYOUT_STORAGE_KEY, "clusters");
@@ -89,12 +93,30 @@ describe("view store", () => {
     expect(fresh.useViewStore.getState().graphLayout).toBe("clusters");
   });
 
-  it("ignores invalid localStorage values and falls back to tree", async () => {
-    window.localStorage.setItem(GRAPH_LAYOUT_STORAGE_KEY, "garbage");
+  it("rehydrates stored `tree` value on store init (no migration)", async () => {
+    // Existing users who picked `tree` in a prior session must NOT be flipped
+    // to dendrogram against their will when they reload.
+    window.localStorage.setItem(GRAPH_LAYOUT_STORAGE_KEY, "tree");
     const { vi } = await import("vitest");
     vi.resetModules();
     const fresh = await import("./view-store");
     expect(fresh.useViewStore.getState().graphLayout).toBe("tree");
+  });
+
+  it("rehydrates stored `dendrogram` value on store init", async () => {
+    window.localStorage.setItem(GRAPH_LAYOUT_STORAGE_KEY, "dendrogram");
+    const { vi } = await import("vitest");
+    vi.resetModules();
+    const fresh = await import("./view-store");
+    expect(fresh.useViewStore.getState().graphLayout).toBe("dendrogram");
+  });
+
+  it("ignores invalid localStorage values and falls back to dendrogram", async () => {
+    window.localStorage.setItem(GRAPH_LAYOUT_STORAGE_KEY, "garbage");
+    const { vi } = await import("vitest");
+    vi.resetModules();
+    const fresh = await import("./view-store");
+    expect(fresh.useViewStore.getState().graphLayout).toBe("dendrogram");
   });
 
   // ------------------------------------------------------------------
