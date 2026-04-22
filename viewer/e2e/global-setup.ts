@@ -1,6 +1,14 @@
-import { copyFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  existsSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { generateLargeGraph } from "../src/lib/fixtures/large";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -38,6 +46,15 @@ export default async function globalSetup() {
       copyDir(sourceRoot, dstSource);
     }
   }
+
+  // Stage the synthesized large-scale fixture for the fps-bench + large-scale
+  // specs. The JSON is not committed (too bulky) — regenerate on every run.
+  // Seed=1 keeps the output byte-stable.
+  const large = generateLargeGraph(1);
+  const largeJson = JSON.stringify(large);
+  const largeDest = resolve(here, "fixtures/large/graph.json");
+  mkdirSync(dirname(largeDest), { recursive: true });
+  writeFileSync(largeDest, largeJson, "utf8");
 }
 
 function copyDir(from: string, to: string) {
