@@ -9,7 +9,7 @@
  *   - cross-cluster edge remains visible at overview zoom
  */
 import { test, expect } from "@playwright/test";
-import { waitForGraphReady } from "./helpers";
+import { expandCluster, waitForGraphReady } from "./helpers";
 
 test.describe("Hierarchy — cluster expand/collapse", () => {
   test("default-collapsed — top-level clusters visible, files hidden", async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
     // attribute on the cluster itself.
     const top00 = page.getByTestId("cluster-top00");
     await expect(top00).toBeVisible();
-    await top00.click();
+    await expandCluster(page, "top00");
     await page.waitForTimeout(300);
     await expect(top00).toHaveAttribute("data-expanded", "true");
   });
@@ -58,7 +58,7 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
     await page.goto("/?graph=large");
     await waitForGraphReady(page);
     await page.waitForTimeout(400);
-    await page.getByTestId("cluster-top02").click();
+    await expandCluster(page, "top02");
     await page.waitForTimeout(200);
     await page.reload();
     await waitForGraphReady(page);
@@ -87,8 +87,7 @@ test.describe("Nested-cluster rendering (Bug 1)", () => {
     expect(midBefore).toBe(0);
 
     // Expand top05 — its children are mid00..mid14 clusters.
-    const top = page.getByTestId("cluster-top05");
-    await top.click();
+    await expandCluster(page, "top05");
     await page.waitForTimeout(400);
 
     // Assert child clusters are now in the DOM, with the expected parent link.
@@ -104,7 +103,7 @@ test.describe("Nested-cluster rendering (Bug 1)", () => {
     await page.waitForTimeout(400);
 
     // Expand top03
-    await page.getByTestId("cluster-top03").click();
+    await expandCluster(page, "top03");
     await page.waitForTimeout(300);
     // mid00 under top03 should now be a clickable cluster.
     const mid = page.getByTestId("cluster-top03/mid00");
@@ -112,7 +111,7 @@ test.describe("Nested-cluster rendering (Bug 1)", () => {
     // Before expanding the mid, there are no file nodes under it.
     const filesBefore = await page.locator("[data-testid^='node-']").count();
     // Expand the mid cluster
-    await mid.click();
+    await expandCluster(page, "top03/mid00");
     await page.waitForTimeout(400);
     const filesAfter = await page.locator("[data-testid^='node-']").count();
     expect(filesAfter).toBeGreaterThan(filesBefore);
@@ -142,7 +141,7 @@ test.describe("Edges render as SVG paths (Bug 3)", () => {
 
     // Expand top00 → its sibling xml file + mid14.d/ sub-cluster become
     // visible, so d-aggregate edges now draw WITHIN top00.
-    await page.getByTestId("cluster-top00").click();
+    await expandCluster(page, "top00");
     await page.waitForTimeout(400);
     const pathsAfterExpand = await page
       .locator("svg.react-flow__edges path.react-flow__edge-path")
@@ -196,9 +195,9 @@ test.describe("Post-finalize blocker fixes", () => {
     // (mid-level cluster nested inside top00); `top01` is its top-level sibling.
     // Before the fix, mid00's interior would spill past top00's right edge and
     // overlap top01's rectangle.
-    await page.getByTestId("cluster-top00").click();
+    await expandCluster(page, "top00");
     await page.waitForTimeout(300);
-    await page.getByTestId("cluster-top00/mid00").click();
+    await expandCluster(page, "top00/mid00");
     await page.waitForTimeout(500);
 
     const midBox = await page.getByTestId("cluster-top00/mid00").boundingBox();
