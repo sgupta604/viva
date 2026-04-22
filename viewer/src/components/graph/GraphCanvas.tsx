@@ -181,10 +181,23 @@ export function GraphCanvas() {
       // (the color + legend already convey the kind). Aggregated edges keep
       // their always-on `×N` label because the count is real information
       // that hover-to-discover would hide.
-      const label = isAggregated ? `${e.kind} ×${e.count}` : undefined;
+      //
+      // Tree-mode override (user feedback 2026-04-22): NO always-on labels
+      // at all. The default tree view is too dense — even `include ×3`
+      // chips piled up unreadably. Aggregated count + kind are surfaced
+      // via the edge's accessible label (browser tooltip on hover of the
+      // SVG path) instead. Cluster mode keeps the always-on `×N` chips
+      // since the user said cluster info-density is fine.
+      const aggregatedChip = isAggregated ? `${e.kind} ×${e.count}` : undefined;
       const isEndpointSelected =
         selectedFileId !== null &&
         (e.source === selectedFileId || e.target === selectedFileId);
+      const visibleLabel = isTreeMode
+        ? undefined
+        : aggregatedChip ?? (isEndpointSelected ? e.kind : undefined);
+      const hoverDescription = isAggregated
+        ? `${e.kind} ×${e.count}`
+        : e.kind;
       // Z-ORDER (FR7): React Flow paints edges below compound parentNode
       // children by default. Bump zIndex so config edges stay visible
       // crossing a cluster fill — fixes the "d-aggregate ×12 underneath
@@ -202,6 +215,11 @@ export function GraphCanvas() {
             : style.strokeWidth,
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: style.stroke },
+        // ariaLabel renders as a native browser tooltip on the SVG path
+        // (React Flow forwards it onto the edge group). Gives tree-mode
+        // edges a hover-to-discover affordance without polluting the
+        // canvas with always-on chips.
+        ariaLabel: hoverDescription,
         data: {
           kind: e.kind,
           unresolved: e.unresolved,
@@ -212,10 +230,7 @@ export function GraphCanvas() {
           // reconstructing from `data.kind`.
           directLabel: e.kind,
         },
-        // For non-aggregated edges with a selected endpoint we surface the
-        // kind label too (helps when the user is inspecting a file's
-        // outgoing edges). Otherwise undefined → React Flow omits the DOM.
-        label: label ?? (isEndpointSelected ? e.kind : undefined),
+        label: visibleLabel,
         labelStyle: {
           fontSize: 10,
           fill: "#d1d5db",
