@@ -72,6 +72,19 @@ def test_expected_counts(sample_module: Path):
     # environments/dev.json has $include to ../config/ingestion.xml (resolved).
     assert len(unresolved) >= 2
 
+    # v2 schema invariants (C.2 + C.5)
+    assert g.version == 2
+    # The sample-module fixture has 7 folders → 7 ClusterNode entries.
+    assert len(g.clusters) >= 7
+    # All cluster paths correspond to discovered files' folders (no drift).
+    folders_seen = {f.folder for f in g.files if f.folder}
+    cluster_paths = {c.path for c in g.clusters}
+    # Every file-folder has a cluster (the reverse is relaxed — ancestor clusters
+    # may exist without a direct file).
+    assert folders_seen.issubset(cluster_paths)
+    # No .d/ aggregates in the sample-module fixture (exercised in sample-d-dir).
+    assert not any(c.kind == "d-aggregate" for c in g.clusters)
+
 
 @pytest.mark.integration
 def test_matches_committed_expected(sample_module: Path):
