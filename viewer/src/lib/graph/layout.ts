@@ -28,6 +28,21 @@ export interface LaidOutGraph {
 export const NODE_W = 224;
 export const NODE_H = 76;
 
+// ---------------------------------------------------------------------------
+// v2 cluster-layout dimensions (large-codebase-viewer)
+// Single source of truth for ClusterNode.tsx and cluster-layout.ts. Consumers
+// MUST import these rather than hard-code — lesson from xml-viewer-hardening
+// 26f948f (FileNode width drift against dagre layout slot).
+// ---------------------------------------------------------------------------
+/** Header strip of an expanded cluster: title + toggle + child-count badge. */
+export const CLUSTER_HEADER_HEIGHT = 32;
+/** Inner padding inside an expanded cluster before first child tile. */
+export const CLUSTER_PADDING = 16;
+/** Width of a collapsed cluster tile (shown at overview zoom). */
+export const COLLAPSED_CLUSTER_W = 220;
+/** Height of a collapsed cluster tile. */
+export const COLLAPSED_CLUSTER_H = 64;
+
 /**
  * Compute a deterministic, folder-aware dagre layout. Called on the filtered
  * graph; memoize at the caller. Two calls with the same input produce identical
