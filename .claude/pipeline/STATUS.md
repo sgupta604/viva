@@ -6,20 +6,16 @@
 
 | Field | Value |
 |-------|-------|
-| Feature | xml-viewer-hardening |
-| Phase | post-diagnose-fix-applied |
-| Next | Awaiting user eyeball on `feat/xml-viewer-hardening` (pushed). Two new commits: `dd2f273 fix(crawler): exclude --emit-sources output subtree from walk` + `26f948f fix(viewer): pin FileNode width to dagre layout constant`. Crawler 69/69 green (incl. new twice-crawl regression test), viewer 50/50 green (incl. new FileNode width test), lint/typecheck/build clean. After user confirms the graph looks clean, they merge the PR. |
+| Feature | — idle — |
+| Phase | — |
+| Next | — |
 
 ## Reminders (surface when user returns)
 
 - Fresh-repo migration (clean history, no Claude attribution) still on deck.
-- Deferred follow-up branch after this lands: **smart static analysis** — dead-param detection, orphan refs, cycle detection, cross-file schema inference ("replace-an-LLM" ambition). Not in the current branch.
+- Deferred follow-up branch now due: **smart static analysis** — dead-param detection, orphan refs, cycle detection, cross-file schema inference ("replace-an-LLM" ambition). Waiting for user to kick the tires on the new xml-viewer-hardening baseline before scoping.
 - Plan Mode design locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when there's appetite.
 - Product-strategy conversation: extending viva beyond config formats (Tier 1/2/3).
-
-## Locked Decisions
-
-See `.claude/docs/DECISIONS.md` for design decisions made for future work (currently: viewer state mgmt, Plan Mode data model). Append-only, in-repo, portable across machines.
 
 ## Queue
 
@@ -27,9 +23,9 @@ _(empty)_
 
 ## Completed
 
-| Feature | Date | PR |
+| Feature | Date | PR / Merge |
 |---------|------|----|
-| xml-viewer-hardening | 2026-04-21 | (see PR link once merged) |
+| xml-viewer-hardening | 2026-04-21 | merged to main (fast-forward, 14 commits, tip `d1ed38b`) |
 | v1-demo | 2026-04-18 | merged to main |
 | runtime-image | 2026-04-18 | merged to main |
 | ghcr-publish | 2026-04-18 | merged to main |
