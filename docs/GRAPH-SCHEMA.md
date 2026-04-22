@@ -281,6 +281,12 @@ When a user selects a param with key `K`:
 - With `--no-timestamp`, two consecutive runs on the same input produce
   byte-identical output (SHA-256 equal). Includes `clusters[]` and all v2
   additions.
+- **Re-crawl invariant.** Crawling the same root twice *back-to-back* produces
+  byte-identical `graph.json`. Guarded by `test_dogfood.py::test_dogfood_
+  recrawl_byte_identical` (viva itself) + `test_scale_synthetic.py::
+  test_scale_crawl_recrawl_byte_identical` (3k synthetic). Any new feature
+  that alters discovery or emission MUST ship with a re-crawl test — lesson
+  from the xml-viewer-hardening post-finalize sidecar-feedback-loop.
 
 ## Fixture lockstep
 
