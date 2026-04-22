@@ -71,4 +71,24 @@ describe("FileNode", () => {
     expect(nameEl).not.toBeNull();
     expect(nameEl!.className).toMatch(/truncate/);
   });
+
+  it("renders a 'gen' badge + data-generated when generated=true (V.9)", () => {
+    const file = makeFile({
+      generated: true,
+      generatedFrom: "scripts/templating_config.yaml",
+    });
+    const { getByTestId, getByLabelText } = renderNode(file);
+    const el = getByTestId("node-f1") as HTMLElement;
+    expect(el.getAttribute("data-generated")).toBe("true");
+    const badge = getByLabelText("generated from template");
+    expect(badge.textContent?.toLowerCase()).toContain("gen");
+  });
+
+  it("does NOT render a gen badge when generated=false", () => {
+    const file = makeFile({ generated: false });
+    const { getByTestId, queryByLabelText } = renderNode(file);
+    const el = getByTestId("node-f1") as HTMLElement;
+    expect(el.getAttribute("data-generated")).toBeNull();
+    expect(queryByLabelText("generated from template")).toBeNull();
+  });
 });

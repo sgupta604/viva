@@ -1,10 +1,13 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
   type Node,
   type Edge as RFEdge,
   MarkerType,
+  useOnViewportChange,
+  ReactFlowProvider,
+  type Viewport,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -17,13 +20,15 @@ import { computeClusterLayout } from "@/lib/graph/cluster-layout";
 import { edgeStyleFor } from "./EdgeStyles";
 import FileNode from "./FileNode";
 import ClusterNode from "./ClusterNode";
+import { zoomModeFor, type ZoomMode } from "./SemanticZoom";
 
 const nodeTypes = {
   file: FileNode,
   cluster: ClusterNode,
 };
 
-export function GraphCanvas() {
+/** Inner component — must be rendered inside ReactFlowProvider. */
+function GraphCanvasInner() {
   const graph = useGraphStore((s) => s.graph);
   const kinds = useFilterStore((s) => s.kinds);
   const hideTests = useFilterStore((s) => s.hideTests);
@@ -32,6 +37,15 @@ export function GraphCanvas() {
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
   const expanded = useHierarchyStore((s) => s.expanded);
   const expand = useHierarchyStore((s) => s.expand);
+
+  const [zoomMode, setZoomMode] = useState<ZoomMode>("detail");
+  // Listen for viewport changes; flip CSS class, never recompute layout.
+  useOnViewportChange({
+    onChange: (vp: Viewport) => {
+      const next = zoomModeFor(vp.zoom);
+      setZoomMode((cur) => (cur === next ? cur : next));
+    },
+  });
 
   // On first load, auto-expand the top-level if there's exactly one top
   // cluster (auto-descend-on-single-child-root — Q3 / V.10 requirement).
@@ -139,7 +153,11 @@ export function GraphCanvas() {
   if (!filtered || !layout) return null;
 
   return (
-    <div className="relative h-full w-full" data-testid="graph-canvas">
+    <div
+      className="relative h-full w-full"
+      data-testid="graph-canvas"
+      data-zoom-mode={zoomMode}
+    >
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -176,5 +194,14 @@ export function GraphCanvas() {
         <span>Read-only view — graph reflects parsed code</span>
       </div>
     </div>
+  );
+}
+
+/** Public wrapper — installs ReactFlowProvider so the viewport hook is valid. */
+export function GraphCanvas() {
+  return (
+    <ReactFlowProvider>
+      <GraphCanvasInner />
+    </ReactFlowProvider>
   );
 }

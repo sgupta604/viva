@@ -50,23 +50,45 @@ function FileNodeInner({ data, selected }: Props) {
   // never exceeds its reserved slot. `truncate` on the inner <div>s clips
   // long filenames/folder paths; the title attribute surfaces the full
   // path on hover.
+  // v2 generated-file variant — faded border + "gen" badge. Interaction
+  // behaviour unchanged (still selectable, same handles).
+  const generatedClass = f.generated
+    ? "opacity-70 border-dashed"
+    : "";
+
   return (
     <div
       role="button"
       tabIndex={0}
       aria-label={`file ${f.path}`}
       data-testid={`node-${f.id}`}
+      data-generated={f.generated ? "true" : undefined}
       style={{ width: NODE_W }}
-      className={`rounded-md border-2 ${KIND_COLOR[f.kind]} bg-neutral-900 px-3 py-2 text-left shadow-md transition ${ring}`}
+      className={`rounded-md border-2 ${KIND_COLOR[f.kind]} bg-neutral-900 px-3 py-2 text-left shadow-md transition ${ring} ${generatedClass}`}
     >
       <Handle type="target" position={Position.Left} className="!bg-neutral-500" />
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1 truncate font-mono text-base text-neutral-100" title={f.name}>
           {f.name}
         </div>
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${KIND_BADGE[f.kind]}`}>
-          {f.kind}
-        </span>
+        <div className="flex shrink-0 items-center gap-1">
+          {f.generated && (
+            <span
+              className="rounded bg-amber-900/30 px-1 py-0.5 text-[9px] font-medium uppercase text-amber-300"
+              aria-label="generated from template"
+              title={
+                f.generatedFrom
+                  ? `generated from ${f.generatedFrom}`
+                  : "generated"
+              }
+            >
+              gen
+            </span>
+          )}
+          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${KIND_BADGE[f.kind]}`}>
+            {f.kind}
+          </span>
+        </div>
       </div>
       <div className="truncate px-1.5 pt-0.5 text-xs text-neutral-500" title={f.folder || "/"}>
         {f.folder || "/"}
