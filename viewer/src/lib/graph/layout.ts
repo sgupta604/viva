@@ -21,8 +21,12 @@ export interface LaidOutGraph {
   folders: string[];
 }
 
-const NODE_W = 224;
-const NODE_H = 76;
+// Fixed node dimensions reserved by dagre. FileNode pins its rendered
+// width to NODE_W via an import in FileNode.tsx so the DOM card never
+// exceeds the reserved layout slot (long paths previously stretched the
+// card past NODE_W and overlapped neighbors).
+export const NODE_W = 224;
+export const NODE_H = 76;
 
 /**
  * Compute a deterministic, folder-aware dagre layout. Called on the filtered

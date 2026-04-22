@@ -3,6 +3,7 @@ import { Handle, Position } from "reactflow";
 import { useSelectionStore } from "@/lib/state/selection-store";
 import { useGraphStore } from "@/lib/state/graph-store";
 import { highlightsFor } from "@/lib/highlight/param-refs";
+import { NODE_W } from "@/lib/graph/layout";
 import type { FileNode as FileNodeData } from "@/lib/graph/types";
 
 interface Props {
@@ -45,22 +46,31 @@ function FileNodeInner({ data, selected }: Props) {
           ? "ring-2 ring-blue-400"
           : "";
 
+  // Pin the rendered width to the dagre layout constant so the DOM node
+  // never exceeds its reserved slot. `truncate` on the inner <div>s clips
+  // long filenames/folder paths; the title attribute surfaces the full
+  // path on hover.
   return (
     <div
       role="button"
       tabIndex={0}
       aria-label={`file ${f.path}`}
       data-testid={`node-${f.id}`}
-      className={`min-w-[200px] rounded-md border-2 ${KIND_COLOR[f.kind]} bg-neutral-900 px-3 py-2 text-left shadow-md transition ${ring}`}
+      style={{ width: NODE_W }}
+      className={`rounded-md border-2 ${KIND_COLOR[f.kind]} bg-neutral-900 px-3 py-2 text-left shadow-md transition ${ring}`}
     >
       <Handle type="target" position={Position.Left} className="!bg-neutral-500" />
       <div className="flex items-center justify-between gap-2">
-        <div className="truncate font-mono text-base text-neutral-100">{f.name}</div>
-        <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${KIND_BADGE[f.kind]}`}>
+        <div className="min-w-0 flex-1 truncate font-mono text-base text-neutral-100" title={f.name}>
+          {f.name}
+        </div>
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${KIND_BADGE[f.kind]}`}>
           {f.kind}
         </span>
       </div>
-      <div className="truncate px-1.5 pt-0.5 text-xs text-neutral-500">{f.folder || "/"}</div>
+      <div className="truncate px-1.5 pt-0.5 text-xs text-neutral-500" title={f.folder || "/"}>
+        {f.folder || "/"}
+      </div>
       {f.parseError && (
         <div className="mt-1 truncate text-[10px] text-red-400" title={f.parseError}>
           parse error
