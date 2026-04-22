@@ -1,23 +1,34 @@
 /**
- * E2E coverage for the v3 tree-layout redesign:
- *  - Default-on-load is tree mode (`localStorage` cleared first).
- *  - Toggle round-trip: tree → clusters → tree, with `graph.json` fetched
- *    once total (the second toggle hits cached state).
- *  - Expand/collapse parity (FR9): expand a cluster in tree mode, toggle
- *    to clusters, that cluster is still expanded.
- *  - Edge legend visible in both modes; every kind from `EDGE_KIND_META`
- *    has a row.
- *  - Edge z-order proxy: no edge `path` element has been masked by a node
- *    bbox at the path midpoint. This is a best-effort programmatic check;
- *    the human visual-review gate (`.claude/templates/visual-review.md`)
- *    is the real authority for "edges paint above nodes."
+ * E2E coverage for the original v3 tree-layout (the second pill option,
+ * mrtree-on-cluster-containment-boxes). Dendrogram became the default in
+ * the 2026-04-22 continuation; coverage of the dendrogram-specific behavior
+ * lives in `dendrogram-layout.spec.ts`. This file intentionally exercises
+ * the TREE pill explicitly so the original layout stays alive as a
+ * comparison option.
+ *
+ *   - Tree mode renders correctly when explicitly selected (via stored
+ *     localStorage value).
+ *   - Toggle round-trip: tree → clusters → tree, with `graph.json` fetched
+ *     once total (the second toggle hits cached state).
+ *   - Expand/collapse parity (FR9): expand a cluster in tree mode, toggle
+ *     to clusters, that cluster is still expanded.
+ *   - Edge legend visible in both modes; every kind from `EDGE_KIND_META`
+ *     has a row.
+ *   - Edge z-order proxy: no edge `path` element has been masked by a node
+ *     bbox at the path midpoint. This is a best-effort programmatic check;
+ *     the human visual-review gate (`.claude/templates/visual-review.md`)
+ *     is the real authority for "edges paint above nodes."
  */
 import { test, expect, type Page } from "@playwright/test";
 
+/** Fresh page with `tree` explicitly selected via localStorage. */
 async function gotoFresh(page: Page, url = "/"): Promise<void> {
   await page.addInitScript(() => {
     try {
       window.localStorage.clear();
+      // The default is `dendrogram` post-continuation. Pin to `tree` so this
+      // file's specs exercise the tree-pill behavior regardless of default.
+      window.localStorage.setItem("viva.viewStore.graphLayout", "tree");
     } catch {
       // private mode — ignore
     }
@@ -26,7 +37,7 @@ async function gotoFresh(page: Page, url = "/"): Promise<void> {
 }
 
 test.describe("tree-layout default + toggle", () => {
-  test("default-on-load is tree mode", async ({ page }) => {
+  test("tree mode renders when explicitly selected", async ({ page }) => {
     await gotoFresh(page);
     await expect(page.getByTestId("graph-canvas")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("graph-layout-tree")).toHaveAttribute(
@@ -34,6 +45,10 @@ test.describe("tree-layout default + toggle", () => {
       "true",
     );
     await expect(page.getByTestId("graph-layout-clusters")).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    await expect(page.getByTestId("graph-layout-dendrogram")).toHaveAttribute(
       "aria-pressed",
       "false",
     );

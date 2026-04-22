@@ -14,6 +14,44 @@
 import { test, expect, type Page } from "@playwright/test";
 
 test.describe("FPS bench — large-scale fixture", () => {
+  test("dendrogram mode: p95 frame time < 33 ms on 3k-file fixture pan", async ({
+    page,
+  }) => {
+    // Dendrogram is the new default (2026-04-22). Same LRU cache in
+    // layout.worker.ts protects pan/zoom from re-running ELK; if this
+    // gate fails the cache key in dendrogram-layout.ts:cacheKeyFor (the
+    // `dendrogram/` prefixed bucket) is the first place to look.
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem("viva.viewStore.graphLayout", "dendrogram");
+      } catch {
+        /* ignore */
+      }
+    });
+    await page.goto("/?graph=large");
+    await page.waitForSelector("[data-testid='graph-canvas']");
+    await expect(page.getByTestId("graph-canvas")).toBeVisible();
+    await expect(page.getByTestId("graph-layout-dendrogram")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // Give the async dendrogram layout a moment to settle the worker
+    // round-trip on the 3k-file fixture.
+    await page.waitForTimeout(500);
+
+    const frames = await captureFrameTimes(page, 2000);
+    const p95 = percentile(frames, 0.95);
+    test.info().annotations.push({
+      type: "fps-bench-dendrogram",
+      description: `p95 frame time = ${p95.toFixed(2)} ms over ${frames.length} frames`,
+    });
+    expect(
+      p95,
+      `dendrogram mode p95 frame time must be < 33ms (LRU cache in layout.worker.ts is the lever)`,
+    ).toBeLessThan(33);
+  });
+
   test("clusters mode: p95 frame time < 33 ms on 3k-file fixture pan", async ({
     page,
   }) => {
