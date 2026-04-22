@@ -1,23 +1,58 @@
 /**
- * Always-visible edge legend chip — bottom-left of the graph canvas, next
- * to React Flow's <Controls />. Reads kind/color/label from the single
- * `EDGE_KIND_META` source in `EdgeStyles.ts` so a new edge kind cannot
- * drift between renderer and legend (research §FR8 path B precondition).
+ * Always-visible edge legend chip.
+ *
+ * Positioning (user feedback 2026-04-22): top-right of the graph canvas.
+ * Was previously bottom-left, where it covered React Flow's <Controls />
+ * fit-view button. Top-right keeps it out of the way of both the controls
+ * and the bottom-right read-only hint.
+ *
+ * Content varies by graph layout:
+ *   - tree mode    → compact 2-row legend (hierarchy + reference) — matches
+ *                    the 2-color tree palette in EdgeStyles.ts.
+ *   - clusters mode → full 6-row legend driven by EDGE_KIND_META.
+ *
+ * Both forms read from EdgeStyles.ts so a new edge kind (cluster mode) or
+ * a palette tweak (tree mode) cannot drift between renderer and legend.
  *
  * Collapsible (default expanded). Collapse state persists in
  * `useViewStore.legendCollapsed` so a reload remembers the user's choice.
  */
 import { useViewStore } from "@/lib/state/view-store";
-import { EDGE_KIND_META } from "./EdgeStyles";
+import { EDGE_KIND_META, TREE_LEGEND_ROWS } from "./EdgeStyles";
 
 export function EdgeLegend() {
   const collapsed = useViewStore((s) => s.legendCollapsed);
   const setCollapsed = useViewStore((s) => s.setLegendCollapsed);
+  const graphLayout = useViewStore((s) => s.graphLayout);
+  const isTreeMode = graphLayout === "tree";
+
+  // Build a unified row array so the JSX below stays single-shape; each
+  // row carries its own data-testid suffix so existing per-kind selectors
+  // continue to work in cluster mode and tree mode gets `hierarchy` /
+  // `reference` selectors.
+  const rows = isTreeMode
+    ? TREE_LEGEND_ROWS.map((r) => ({
+        key: r.bucket,
+        testIdSuffix: r.bucket,
+        color: r.color,
+        strokeWidth: r.strokeWidth,
+        dasharray: undefined as string | undefined,
+        label: r.label,
+      }))
+    : EDGE_KIND_META.map((m) => ({
+        key: m.kind,
+        testIdSuffix: m.kind,
+        color: m.color,
+        strokeWidth: m.strokeWidth,
+        dasharray: m.dasharray,
+        label: m.label,
+      }));
 
   return (
     <div
-      className="pointer-events-auto absolute bottom-3 left-3 z-20 rounded-md border border-neutral-700 bg-neutral-900/90 px-2 py-1.5 text-[11px] text-neutral-300 shadow-md backdrop-blur-sm"
+      className="pointer-events-auto absolute right-3 top-3 z-20 rounded-md border border-neutral-700 bg-neutral-900/90 px-2 py-1.5 text-[11px] text-neutral-300 shadow-md backdrop-blur-sm"
       data-testid="edge-legend"
+      data-legend-mode={isTreeMode ? "tree" : "clusters"}
       aria-label="edge color legend"
     >
       <button
@@ -35,11 +70,11 @@ export function EdgeLegend() {
 
       {!collapsed && (
         <ul className="mt-1.5 flex flex-col gap-1" data-testid="edge-legend-list">
-          {EDGE_KIND_META.map((m) => (
+          {rows.map((r) => (
             <li
-              key={m.kind}
+              key={r.key}
               className="flex items-center gap-2 font-mono"
-              data-testid={`edge-legend-item-${m.kind}`}
+              data-testid={`edge-legend-item-${r.testIdSuffix}`}
             >
               <svg
                 width="22"
@@ -52,12 +87,12 @@ export function EdgeLegend() {
                   y1="3"
                   x2="22"
                   y2="3"
-                  stroke={m.color}
-                  strokeWidth={Math.max(1.5, m.strokeWidth)}
-                  strokeDasharray={m.dasharray}
+                  stroke={r.color}
+                  strokeWidth={Math.max(1.5, r.strokeWidth)}
+                  strokeDasharray={r.dasharray}
                 />
               </svg>
-              <span className="text-neutral-300">{m.label}</span>
+              <span className="text-neutral-300">{r.label}</span>
             </li>
           ))}
         </ul>

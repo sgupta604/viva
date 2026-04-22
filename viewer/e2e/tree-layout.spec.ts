@@ -135,9 +135,38 @@ test.describe("edge legend visibility", () => {
     await expect(page.getByTestId("edge-legend")).toBeVisible();
   });
 
-  test("legend shows a row for every edge kind", async ({ page }) => {
+  test("legend shows compact 2-row form in tree mode (hierarchy + reference)", async ({
+    page,
+  }) => {
     await gotoFresh(page);
     await expect(page.getByTestId("edge-legend")).toBeVisible({ timeout: 10_000 });
+    // Default-on-load is tree mode → 2-row collapsed palette per user
+    // feedback 2026-04-22.
+    await expect(page.getByTestId("edge-legend")).toHaveAttribute(
+      "data-legend-mode",
+      "tree",
+    );
+    for (const bucket of ["hierarchy", "reference"]) {
+      await expect(
+        page.getByTestId(`edge-legend-item-${bucket}`),
+      ).toBeVisible();
+    }
+    // The full per-kind rows must NOT leak into tree mode.
+    for (const kind of ["include", "ref", "import", "xsd", "d-aggregate", "logical-id"]) {
+      await expect(
+        page.getByTestId(`edge-legend-item-${kind}`),
+      ).toHaveCount(0);
+    }
+  });
+
+  test("legend shows full 6-row palette in clusters mode", async ({ page }) => {
+    await gotoFresh(page);
+    await expect(page.getByTestId("edge-legend")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("graph-layout-clusters").click();
+    await expect(page.getByTestId("edge-legend")).toHaveAttribute(
+      "data-legend-mode",
+      "clusters",
+    );
     // Match EDGE_KIND_META — kept in lockstep with the source via Vitest.
     for (const kind of [
       "include",
@@ -151,6 +180,28 @@ test.describe("edge legend visibility", () => {
         page.getByTestId(`edge-legend-item-${kind}`),
       ).toBeVisible();
     }
+  });
+
+  test("legend is anchored top-right (clear of React Flow Controls)", async ({
+    page,
+  }) => {
+    // User feedback 2026-04-22: legend was overlapping the bottom-left
+    // fit-view button. Verify the chip lives in the top-right quadrant of
+    // the canvas.
+    await gotoFresh(page);
+    const canvas = page.getByTestId("graph-canvas");
+    await expect(canvas).toBeVisible({ timeout: 10_000 });
+    const canvasBox = await canvas.boundingBox();
+    const legendBox = await page.getByTestId("edge-legend").boundingBox();
+    expect(canvasBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    if (!canvasBox || !legendBox) return;
+    const legendCenterX = legendBox.x + legendBox.width / 2;
+    const legendCenterY = legendBox.y + legendBox.height / 2;
+    const canvasCenterX = canvasBox.x + canvasBox.width / 2;
+    const canvasCenterY = canvasBox.y + canvasBox.height / 2;
+    expect(legendCenterX).toBeGreaterThan(canvasCenterX);
+    expect(legendCenterY).toBeLessThan(canvasCenterY);
   });
 
   test("legend collapses on click and remembers its state", async ({ page }) => {
