@@ -11,12 +11,17 @@
  *     become leaves of their immediate cluster. Matches the user's
  *     "Research Graph Datasets" reference image exactly. Keeps expand/
  *     collapse semantics uniform with cluster mode.
- *  2. **Off-main-thread when possible.** Hands the marshaled ElkNode tree
- *     to the Web Worker shell at `layout.worker.ts`. When `Worker` is
- *     unavailable (jsdom in Vitest, SSR), falls back to calling
- *     `computeElkLayout` synchronously on the main thread — the worker
- *     module exports the same pure function. The cache lives module-scope
- *     in the worker module, so both paths share LRU benefits.
+ *  2. **Off-main-thread via elk's OWN worker.** `computeElkLayout` (in
+ *     `layout.worker.ts`) instantiates `elkjs/lib/elk-api.js` on the
+ *     main thread and gives it a `workerFactory` that spawns elk's
+ *     `elk-worker.min.js` as a classic Web Worker. The heavy GWT
+ *     compute runs off-thread, but WE never own the worker — elk does.
+ *     This sidesteps the "elk-worker.min.js hijacks self.onmessage"
+ *     conflict that broke our previous "custom worker that imports
+ *     elk.bundled" arrangement (see diagnosis 2026-04-22).
+ *     In Vitest (jsdom, no `Worker`), `computeElkLayout` falls back to
+ *     `elk.bundled.js` which runs on the main thread synchronously
+ *     enough for tests.
  *  3. **Single source of truth for dimensions.** Reads `NODE_W` / `NODE_H`
  *     and the cluster constants from `lib/graph/layout.ts` — NEVER
  *     redeclares (xml-viewer-hardening 26f948f lesson).
@@ -38,11 +43,7 @@ import {
   COLLAPSED_CLUSTER_W,
   COLLAPSED_CLUSTER_H,
 } from "./layout";
-import {
-  computeElkLayout,
-  type ElkNode,
-  type ComputeOptions,
-} from "./layout.worker";
+import { computeElkLayout, type ElkNode } from "./layout.worker";
 import type {
   LaidOutClusterGraph,
   LaidOutGraphNode,
@@ -52,66 +53,6 @@ import type {
 // Re-export the laid-out shape so GraphCanvas can `import type` from one place
 // once it switches to the type-erased layout interface (follow-up if useful).
 export type { LaidOutClusterGraph, LaidOutGraphNode, LaidOutGraphEdge };
-
-// ---------------------------------------------------------------------------
-// Worker shell (browser only). Created lazily on first use, then reused.
-// ---------------------------------------------------------------------------
-
-let workerHandle: Worker | null = null;
-let workerNextId = 1;
-let workerInflight = new Map<
-  number,
-  {
-    resolve: (root: ElkNode) => void;
-    reject: (e: Error) => void;
-  }
->();
-
-function getWorker(): Worker | null {
-  if (typeof Worker === "undefined") return null;
-  if (workerHandle) return workerHandle;
-  try {
-    workerHandle = new Worker(new URL("./layout.worker.ts", import.meta.url), {
-      type: "module",
-    });
-    workerHandle.onmessage = (
-      ev: MessageEvent<
-        | { id: number; ok: true; root: ElkNode }
-        | { id: number; ok: false; error: string }
-      >,
-    ) => {
-      const pending = workerInflight.get(ev.data.id);
-      if (!pending) return;
-      workerInflight.delete(ev.data.id);
-      if (ev.data.ok) pending.resolve(ev.data.root);
-      else pending.reject(new Error(ev.data.error));
-    };
-    workerHandle.onerror = (ev) => {
-      // Surface to all in-flight requests; reset the worker.
-      const err = new Error(ev.message || "layout worker error");
-      for (const p of workerInflight.values()) p.reject(err);
-      workerInflight = new Map();
-      workerHandle = null;
-    };
-  } catch {
-    // Some test environments stub Worker but throw on construction —
-    // fall back to main-thread compute.
-    workerHandle = null;
-  }
-  return workerHandle;
-}
-
-function runElk(root: ElkNode, options: ComputeOptions): Promise<ElkNode> {
-  const w = getWorker();
-  if (!w) {
-    return computeElkLayout(root, options);
-  }
-  const id = workerNextId++;
-  return new Promise<ElkNode>((resolve, reject) => {
-    workerInflight.set(id, { resolve, reject });
-    w.postMessage({ id, root, options });
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Edge retargeting (same logic as cluster-layout.ts; kept local to avoid
@@ -510,7 +451,7 @@ export async function computeTreeLayout(
   const elkRoots: ElkNode[] = [];
   for (let i = 0; i < topLevel.length; i++) {
     const elkInput = toElkNode(topLevel[i]);
-    const laid = await runElk(elkInput, {
+    const laid = await computeElkLayout(elkInput, {
       algorithm: "mrtree",
       cacheKey: `${cacheKey}/root-${i}`,
     });
