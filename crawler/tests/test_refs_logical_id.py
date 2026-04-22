@@ -15,7 +15,6 @@ from crawler import crawl
 from crawler.graph import FileNode, RawRef
 from crawler.refs import resolve_references
 
-
 FIXTURES = Path(__file__).parent / "fixtures" / "sample-logical-id"
 
 

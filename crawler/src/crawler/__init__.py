@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from .graph import Graph
 
@@ -10,8 +9,8 @@ from .graph import Graph
 def crawl(
     root: Path | str,
     *,
-    include: Optional[list[str]] = None,
-    exclude: Optional[list[str]] = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
     no_timestamp: bool = False,
     use_default_excludes: bool = True,
     jobs: int = 1,
@@ -86,8 +85,9 @@ def crawl(
 
 
 def _utc_now() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Python 3.9 compat — `datetime.UTC` is 3.11+. Keep `timezone.utc`.
+    from datetime import datetime, timezone  # noqa: UP017
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
 
 
 __all__ = ["crawl", "Graph"]

@@ -4,7 +4,6 @@ from pathlib import Path
 
 from crawler import crawl
 
-
 FIXTURES = Path(__file__).parent / "fixtures" / "sample-xsd"
 
 

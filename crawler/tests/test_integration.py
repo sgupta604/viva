@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from crawler import crawl
-from crawler.emit import to_json, write
+from crawler.emit import to_json
 
 
 @pytest.mark.integration

@@ -9,14 +9,12 @@
 from __future__ import annotations
 
 import json as _json
-from io import StringIO
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from ruamel.yaml import YAML
 
 from ..graph import FileNode, ParamNode, RawRef
-
 
 INCLUDE_TAG = "!include"
 
@@ -62,7 +60,7 @@ def parse(abs_path: Path, rel_path: str) -> FileNode:
     return node
 
 
-def _flatten(obj: Any, prefix: str, node: FileNode, line: Optional[int]) -> None:
+def _flatten(obj: Any, prefix: str, node: FileNode, line: int | None) -> None:
     if isinstance(obj, _Include):
         node.raw_refs.append(RawRef(kind="include", raw=str(obj.value)))
         if prefix:

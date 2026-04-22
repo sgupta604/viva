@@ -89,6 +89,7 @@ def test_dogfood_recrawl_byte_identical():
     regression-proof.
     """
     import json
+
     from crawler.emit import to_json
 
     g1 = to_json(crawl(REPO_ROOT, no_timestamp=True))

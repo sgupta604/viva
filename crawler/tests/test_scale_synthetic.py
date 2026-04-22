@@ -49,28 +49,28 @@ def synth_tree(tmp_path_factory) -> Path:
                 else f"top{t:02d}/mid{m:02d}"
             )
             leaf_count = 10 if is_d else LEAF
-            for l in range(leaf_count):
-                idx = t * 1000 + m * 100 + l
+            for li in range(leaf_count):
+                idx = t * 1000 + m * 100 + li
                 r = idx % 10
                 if is_d:
-                    ext, body = "xml", f'<?xml version="1.0"?>\n<piece order="{l}"/>\n'
-                    name = f"{(l+1):02d}-piece{l}.{ext}"
+                    ext, body = "xml", f'<?xml version="1.0"?>\n<piece order="{li}"/>\n'
+                    name = f"{(li+1):02d}-piece{li}.{ext}"
                 elif r < 6:
                     ext = "xml"
                     body = f'<?xml version="1.0"?>\n<root><item id="x_{idx}" value="v{idx}"/></root>\n'
-                    name = f"leaf{l:02d}.xml"
+                    name = f"leaf{li:02d}.xml"
                 elif r < 7:
                     ext = "yaml"
                     body = f"key_{idx}: value_{idx}\n"
-                    name = f"leaf{l:02d}.yaml"
+                    name = f"leaf{li:02d}.yaml"
                 elif r < 9:
                     ext = "json"
                     body = json.dumps({"k": idx}) + "\n"
-                    name = f"leaf{l:02d}.json"
+                    name = f"leaf{li:02d}.json"
                 else:
                     ext = "ini"
                     body = f"[sec]\nkey={idx}\n"
-                    name = f"leaf{l:02d}.ini"
+                    name = f"leaf{li:02d}.ini"
                 _write(root / folder / name, body)
             if is_d:
                 # sibling parent xml — foo.d/ pairs with foo.xml in parent folder
@@ -78,7 +78,7 @@ def synth_tree(tmp_path_factory) -> Path:
                 sibling = f"mid{m:02d}.xml"
                 _write(
                     root / parent / sibling,
-                    f'<?xml version="1.0"?>\n<root/>\n',
+                    '<?xml version="1.0"?>\n<root/>\n',
                 )
     return root
 

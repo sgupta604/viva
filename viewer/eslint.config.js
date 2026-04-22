@@ -24,6 +24,9 @@ const browserGlobals = {
   setTimeout: "readonly",
   clearTimeout: "readonly",
   localStorage: "readonly",
+  sessionStorage: "readonly",
+  Storage: "readonly",
+  URLSearchParams: "readonly",
   JSX: "readonly",
 };
 

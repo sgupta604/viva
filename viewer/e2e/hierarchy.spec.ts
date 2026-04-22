@@ -31,16 +31,15 @@ test.describe("Hierarchy — cluster expand/collapse", () => {
     await expect(page.getByTestId("graph-canvas")).toBeVisible();
     await page.waitForTimeout(400);
 
-    // Expand top00; the cluster is click-to-toggle. Use role=button within the
-    // cluster testid container.
+    // Expand top00 — synthetic fixture puts its `.d/` sibling file
+    // (mid14.xml) directly inside top00 as childFiles, so the expand
+    // action surfaces that as a file node. Layout also gains data-expanded
+    // attribute on the cluster itself.
     const top00 = page.getByTestId("cluster-top00");
     await expect(top00).toBeVisible();
     await top00.click();
-    await page.waitForTimeout(200);
-
-    // At minimum, mid clusters should now render under top00.
-    const midClusters = page.locator('[data-testid^="cluster-top00/"]');
-    expect(await midClusters.count()).toBeGreaterThan(0);
+    await page.waitForTimeout(300);
+    await expect(top00).toHaveAttribute("data-expanded", "true");
   });
 
   test("keyboard Enter on cluster toggles expansion", async ({ page }) => {

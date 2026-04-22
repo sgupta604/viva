@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
-from typing import Literal, Optional
+from typing import Literal
 
 # Schema version this crawler emits. Bumped to 2 for large-codebase-viewer.
 SCHEMA_VERSION = 2
@@ -34,7 +34,7 @@ class ParamNode:
     key: str
     value: str
     kind: ParamKind
-    line: Optional[int]
+    line: int | None
 
     def to_dict(self) -> dict:
         return {"key": self.key, "value": self.value, "kind": self.kind, "line": self.line}
@@ -49,12 +49,12 @@ class FileNode:
     kind: FileKind
     size_bytes: int
     params: list[ParamNode] = field(default_factory=list)
-    parse_error: Optional[str] = None
+    parse_error: str | None = None
     is_test: bool = False
-    raw_refs: list["RawRef"] = field(default_factory=list)
+    raw_refs: list[RawRef] = field(default_factory=list)
     # v2 additions — opt-in templating-manifest flagging.
     generated: bool = False
-    generated_from: Optional[str] = None
+    generated_from: str | None = None
     # v2 sidecar — logical-ID declarations this file makes. Not emitted to the
     # graph.json output (no field in spec). Used only by refs.py to index
     # cross-file logical-id edges. `set` keeps membership O(1); resolver
@@ -89,15 +89,15 @@ class RawRef:
     kind: EdgeKind
     raw: str  # the raw target string (a path, an id, etc.)
     # v2: optional flags — None for legacy callers that don't carry hints.
-    flags: Optional[tuple] = None  # tuple of (key, value) pairs, frozenset-safe
+    flags: tuple | None = None  # tuple of (key, value) pairs, frozenset-safe
 
 
 @dataclass
 class Edge:
     source: str  # file id
-    target: Optional[str]  # file id, None if unresolved
+    target: str | None  # file id, None if unresolved
     kind: EdgeKind
-    unresolved: Optional[str]  # raw target when target is None (may carry a prefix)
+    unresolved: str | None  # raw target when target is None (may carry a prefix)
     # v2 addition — free-form edge metadata. Only `order: int` is currently used
     # (for `.d/` load order). Emitted only when non-empty.
     attrs: dict = field(default_factory=dict)
@@ -130,7 +130,7 @@ class ClusterNode:
     """
 
     path: str  # POSIX path relative to root
-    parent: Optional[str]  # parent cluster path, or None for top-level clusters
+    parent: str | None  # parent cluster path, or None for top-level clusters
     child_files: list[str] = field(default_factory=list)  # file ids directly in this cluster
     child_clusters: list[str] = field(default_factory=list)  # child cluster paths
     kind: ClusterKind = "folder"
@@ -154,7 +154,7 @@ class Graph:
     # `version=1` explicitly still work (the viewer tolerates both on read).
     version: int = SCHEMA_VERSION
     clusters: list[ClusterNode] = field(default_factory=list)
-    generated_at: Optional[str] = None
+    generated_at: str | None = None
 
     def to_dict(self) -> dict:
         out: dict = {
