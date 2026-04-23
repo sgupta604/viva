@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { EdgeLegend } from "./EdgeLegend";
-import { EDGE_KIND_META, TREE_LEGEND_ROWS } from "./EdgeStyles";
+import { EDGE_KIND_META } from "./EdgeStyles";
 import { useViewStore } from "@/lib/state/view-store";
 import { useSelectionStore } from "@/lib/state/selection-store";
 
@@ -59,41 +59,46 @@ describe("EdgeLegend — clusters mode (full 6-row palette)", () => {
   });
 });
 
-describe("EdgeLegend — tree mode (compact 2-row palette)", () => {
+describe("EdgeLegend — flat modes (full 6-row palette)", () => {
   beforeEach(() => {
-    useViewStore.setState({ legendCollapsed: false, graphLayout: "tree" });
     window.localStorage.removeItem("viva.viewStore.legendCollapsed");
   });
 
-  it("renders exactly the two TREE_LEGEND_ROWS entries", () => {
-    render(<EdgeLegend />);
-    for (const row of TREE_LEGEND_ROWS) {
-      expect(
-        screen.getByTestId(`edge-legend-item-${row.bucket}`),
-      ).toBeInTheDocument();
-    }
-    // No per-kind cluster rows should leak into tree mode.
-    for (const m of EDGE_KIND_META) {
-      expect(
-        screen.queryByTestId(`edge-legend-item-${m.kind}`),
-      ).not.toBeInTheDocument();
-    }
-  });
+  // Both flat modes used to render a compact 2-row palette (hierarchy +
+  // reference). User feedback 2026-04-22 (follow-up): the focus-revealed
+  // per-kind colors that light up on hover had no key in the legend, so
+  // every flat mode now mirrors the 6-row cluster palette.
+  for (const layout of ["tree", "dendrogram"] as const) {
+    describe(`graphLayout="${layout}"`, () => {
+      beforeEach(() => {
+        useViewStore.setState({ legendCollapsed: false, graphLayout: layout });
+      });
 
-  it("displays the human-readable label for hierarchy + reference", () => {
-    render(<EdgeLegend />);
-    for (const row of TREE_LEGEND_ROWS) {
-      const li = screen.getByTestId(`edge-legend-item-${row.bucket}`);
-      expect(li.textContent).toContain(row.label);
-    }
-  });
+      it("renders one row per EDGE_KIND_META entry", () => {
+        render(<EdgeLegend />);
+        for (const m of EDGE_KIND_META) {
+          expect(
+            screen.getByTestId(`edge-legend-item-${m.kind}`),
+          ).toBeInTheDocument();
+        }
+      });
 
-  it("declares tree mode via data-legend-mode", () => {
-    render(<EdgeLegend />);
-    expect(
-      screen.getByTestId("edge-legend").getAttribute("data-legend-mode"),
-    ).toBe("tree");
-  });
+      it("displays the human-readable label for every kind", () => {
+        render(<EdgeLegend />);
+        for (const m of EDGE_KIND_META) {
+          const li = screen.getByTestId(`edge-legend-item-${m.kind}`);
+          expect(li.textContent).toContain(m.label);
+        }
+      });
+
+      it("declares tree mode via data-legend-mode (flat-mode marker)", () => {
+        render(<EdgeLegend />);
+        expect(
+          screen.getByTestId("edge-legend").getAttribute("data-legend-mode"),
+        ).toBe("tree");
+      });
+    });
+  }
 });
 
 describe("EdgeLegend — positioning", () => {

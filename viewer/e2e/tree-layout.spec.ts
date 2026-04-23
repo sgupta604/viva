@@ -150,27 +150,45 @@ test.describe("edge legend visibility", () => {
     await expect(page.getByTestId("edge-legend")).toBeVisible();
   });
 
-  test("legend shows compact 2-row form in tree mode (hierarchy + reference)", async ({
+  test("legend shows full 6-row palette in flat (dendrogram + tree) modes", async ({
     page,
   }) => {
+    // User feedback 2026-04-22 (follow-up): the focus-revealed per-kind
+    // colors that light up on hover (include blue, import green, xsd
+    // green-dashed, etc.) had no key in the prior 2-row legend. Every
+    // mode now renders the full EDGE_KIND_META palette so the legend
+    // matches what the canvas can paint.
     await gotoFresh(page);
     await expect(page.getByTestId("edge-legend")).toBeVisible({ timeout: 10_000 });
-    // Default-on-load is tree mode → 2-row collapsed palette per user
-    // feedback 2026-04-22.
+    // Default-on-load is dendrogram (a flat mode) — data-legend-mode
+    // still reads "tree" for both flat layouts to preserve historical
+    // E2E selectors that distinguish flat vs clusters surface.
     await expect(page.getByTestId("edge-legend")).toHaveAttribute(
       "data-legend-mode",
       "tree",
     );
-    for (const bucket of ["hierarchy", "reference"]) {
-      await expect(
-        page.getByTestId(`edge-legend-item-${bucket}`),
-      ).toBeVisible();
-    }
-    // The full per-kind rows must NOT leak into tree mode.
     for (const kind of ["include", "ref", "import", "xsd", "d-aggregate", "logical-id"]) {
       await expect(
         page.getByTestId(`edge-legend-item-${kind}`),
+      ).toBeVisible();
+    }
+    // The old hierarchy/reference bucket rows must be gone.
+    for (const bucket of ["hierarchy", "reference"]) {
+      await expect(
+        page.getByTestId(`edge-legend-item-${bucket}`),
       ).toHaveCount(0);
+    }
+
+    // Toggle to tree mode — same 6-row palette must render.
+    await page.getByTestId("graph-layout-tree").click();
+    await expect(page.getByTestId("edge-legend")).toHaveAttribute(
+      "data-legend-mode",
+      "tree",
+    );
+    for (const kind of ["include", "ref", "import", "xsd", "d-aggregate", "logical-id"]) {
+      await expect(
+        page.getByTestId(`edge-legend-item-${kind}`),
+      ).toBeVisible();
     }
   });
 

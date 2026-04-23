@@ -13,24 +13,29 @@
  * the panel. 416px = 400px panel + 16px breathing margin, matching the
  * 12px chip inset from the canvas edge.
  *
- * Content varies by graph layout:
- *   - flat modes (dendrogram, tree) → compact 2-row legend (hierarchy +
- *     reference) — matches the 2-color flat palette in EdgeStyles.ts.
- *   - clusters mode                 → full 6-row legend driven by
- *     EDGE_KIND_META.
+ * Content (user feedback 2026-04-22, follow-up): every layout — dendrogram,
+ * tree, clusters — renders the full 6-row legend driven by EDGE_KIND_META.
+ * Earlier the flat modes showed a compact 2-row legend (hierarchy + reference)
+ * because the default flat-mode palette is amber-everywhere; but on hover
+ * the focus-revealed palette switches edges to their per-kind color
+ * (include blue, import green, xsd green-dashed, etc.) and the 2-row
+ * legend left users with no key for what those colors meant. Showing the
+ * full 6-row palette in every mode keeps the legend honest about what
+ * colors the canvas can paint.
  *
- * Both forms read from EdgeStyles.ts so a new edge kind (cluster mode) or
- * a palette tweak (flat modes) cannot drift between renderer and legend.
+ * Reads from EdgeStyles.ts so a new edge kind (added to `EDGE_KIND_META`)
+ * cannot drift between renderer and legend.
  *
- * The `data-legend-mode` attribute reads `tree` for both flat modes (kept
- * for backwards-compat with existing E2E selectors).
+ * The `data-legend-mode` attribute still reads `tree` for both flat modes
+ * vs `clusters` for cluster mode (kept for backwards-compat with existing
+ * E2E selectors that distinguish the two surfaces).
  *
  * Collapsible (default expanded). Collapse state persists in
  * `useViewStore.legendCollapsed` so a reload remembers the user's choice.
  */
 import { useViewStore } from "@/lib/state/view-store";
 import { useSelectionStore } from "@/lib/state/selection-store";
-import { EDGE_KIND_META, TREE_LEGEND_ROWS } from "./EdgeStyles";
+import { EDGE_KIND_META } from "./EdgeStyles";
 
 export function EdgeLegend() {
   const collapsed = useViewStore((s) => s.legendCollapsed);
@@ -40,27 +45,18 @@ export function EdgeLegend() {
   const isFlatMode = graphLayout === "tree" || graphLayout === "dendrogram";
   const panelOpen = selectedFileId !== null;
 
-  // Build a unified row array so the JSX below stays single-shape; each
-  // row carries its own data-testid suffix so existing per-kind selectors
-  // continue to work in cluster mode and flat modes get `hierarchy` /
-  // `reference` selectors.
-  const rows = isFlatMode
-    ? TREE_LEGEND_ROWS.map((r) => ({
-        key: r.bucket,
-        testIdSuffix: r.bucket,
-        color: r.color,
-        strokeWidth: r.strokeWidth,
-        dasharray: undefined as string | undefined,
-        label: r.label,
-      }))
-    : EDGE_KIND_META.map((m) => ({
-        key: m.kind,
-        testIdSuffix: m.kind,
-        color: m.color,
-        strokeWidth: m.strokeWidth,
-        dasharray: m.dasharray,
-        label: m.label,
-      }));
+  // Single row shape for every mode. The per-kind testIdSuffix mirrors the
+  // EdgeKind values so existing `edge-legend-item-${kind}` selectors keep
+  // working — and now resolve in flat modes too (was previously
+  // `hierarchy`/`reference` only).
+  const rows = EDGE_KIND_META.map((m) => ({
+    key: m.kind,
+    testIdSuffix: m.kind,
+    color: m.color,
+    strokeWidth: m.strokeWidth,
+    dasharray: m.dasharray,
+    label: m.label,
+  }));
 
   // Inline `right` so the value can switch between two pixel literals
   // (12px when no panel, 416px when the 400-px detail panel is open) —
