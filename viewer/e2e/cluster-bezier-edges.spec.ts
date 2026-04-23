@@ -1,35 +1,36 @@
 /**
- * E2E coverage for Bug #2 (image #17, 2026-04-22): cluster mode at scale
- * had straight smoothstep edges that crisscrossed every cluster box and
- * made the canvas unreadable. Fix: bezier curves for non-hierarchy cross-
- * ref edges in cluster mode + soft focus dim when something is selected.
+ * E2E coverage for cluster-mode edge behavior. Two layers:
  *
- * What this spec locks:
+ *   1. Bezier curves: cross-ref edges render as React Flow `default`
+ *      (bezier), not orthogonal `smoothstep`. Curves arc around obstacles
+ *      and dramatically reduce the "line slicing through unrelated tile"
+ *      problem at scale.
  *
- *   1. Cluster-mode cross-ref edges render as React Flow `default` (bezier)
- *      type, NOT `smoothstep` (orthogonal). Tested by class on the
- *      `react-flow__edge` wrapper.
+ *   2. Uniform focus + context dimming (post-2026-04-22 cluster-mode
+ *      unification per user feedback "do it like you did for dendrogram"):
  *
- *   2. Hierarchy edges (d-aggregate) in cluster mode keep their previous
+ *        a. Default cluster-mode state with nothing focused: cross-ref
+ *           edges render DIM (~0.15 opacity). The dendrogram pattern
+ *           applies in every mode now — edges greyed out by default,
+ *           lighting up only when their tile is hovered/selected. Replaces
+ *           the prior "everything full opacity at idle" cluster behavior
+ *           that the user explicitly rejected.
+ *
+ *        b. Selection lights touching edges: clicking a file with cross-
+ *           refs makes those edges full opacity while unrelated cross-refs
+ *           stay dim.
+ *
+ *        c. Escape clears selection and every cross-ref returns to dim
+ *           (default investigation-ready lattice).
+ *
+ *   3. Hierarchy edges (d-aggregate) in cluster mode keep their previous
  *      treatment (no bezier). They're rare in cluster mode (containment
  *      carries the relationship) but the invariant is locked anyway.
  *
- *   3. Default cluster-mode state with nothing selected: every cross-ref
- *      edge renders at full opacity. The user's "info-density is fine"
- *      verdict is preserved at idle.
- *
- *   4. Selection triggers soft dim: clicking a file makes unrelated
- *      cross-ref edges drop to ~0.35 opacity while edges touching the
- *      selected file stay full. The DOM-level opacity check is the
- *      regression guard for the focus-dim feature.
- *
- *   5. Pressing Escape clears selection and every edge returns to full
- *      opacity (info-density restored).
- *
  * Why this lives in its own spec file: tree-layout.spec.ts already pins
  * the legend + toggle + z-order behavior. This spec is purely about the
- * Bug #2 visual fixes — keeping it isolated keeps test failures pointing
- * at the right symptom.
+ * cluster-mode edge visual contract — keeping it isolated keeps test
+ * failures pointing at the right symptom.
  */
 import { test, expect, type Page } from "@playwright/test";
 
@@ -100,22 +101,48 @@ test.describe("cluster-mode bezier edges (Bug #2)", () => {
     expect(result.bezier).toBeGreaterThanOrEqual(result.smoothstep);
   });
 
-  test("default state with nothing selected: every edge is full opacity (info-density preserved)", async ({
+  test("default state with nothing focused: cross-ref edges are dim (matches dendrogram)", async ({
     page,
   }) => {
     await gotoFreshClusters(page);
     await expect(page.getByTestId("graph-canvas")).toBeVisible({ timeout: 10_000 });
 
-    const opacities = await page.evaluate(() => {
-      const edges = document.querySelectorAll(".react-flow__edge-path");
-      return Array.from(edges).map((e) => {
-        const s = e.getAttribute("style") || "";
+    // Inspect every edge and bucket by visible opacity. Hierarchy edges
+    // (d-aggregate) keep full opacity by default; cross-refs MUST drop to
+    // the ~0.15 dim baseline now that cluster mode matches dendrogram per
+    // the user's "do it like you did for dendrogram" feedback.
+    const buckets = await page.evaluate(() => {
+      const edges = document.querySelectorAll(".react-flow__edge");
+      let crossRefDim = 0;
+      let crossRefLit = 0;
+      let hierarchyFull = 0;
+      let other = 0;
+      for (const e of edges) {
+        const path = e.querySelector(".react-flow__edge-path");
+        if (!path) continue;
+        const s = path.getAttribute("style") || "";
         const m = s.match(/opacity:\s*([0-9.]+)/);
-        return m ? parseFloat(m[1]) : 1;
-      });
+        const o = m ? parseFloat(m[1]) : 1;
+        // d-aggregate hierarchy edges live on `react-flow__edge-smoothstep`
+        // wrappers (we kept smoothstep for them); cross-refs live on
+        // `react-flow__edge-default` (bezier). Use that to disambiguate.
+        const isHierarchy = e.classList.contains("react-flow__edge-smoothstep");
+        if (isHierarchy) {
+          if (o >= 0.99) hierarchyFull += 1;
+          else other += 1;
+        } else {
+          if (Math.abs(o - 0.15) < 0.05) crossRefDim += 1;
+          else if (o >= 0.99) crossRefLit += 1;
+          else other += 1;
+        }
+      }
+      return { crossRefDim, crossRefLit, hierarchyFull, other };
     });
 
-    if (opacities.length === 0) {
+    if (
+      buckets.crossRefDim + buckets.crossRefLit + buckets.hierarchyFull + buckets.other ===
+      0
+    ) {
       test.info().annotations.push({
         type: "note",
         description: "fixture has no edges — opacity check is a no-op",
@@ -123,25 +150,31 @@ test.describe("cluster-mode bezier edges (Bug #2)", () => {
       return;
     }
 
-    // Every edge should be full opacity (1) since nothing is selected.
-    // The `crossRefOpacityFor` `anythingFocused=false` branch returns
-    // FULL for cluster mode.
-    for (const o of opacities) {
-      expect(
-        o,
-        "default cluster-mode opacity should be 1 (info-density preserved)",
-      ).toBeGreaterThanOrEqual(0.99);
+    // Regression guard for the user-rejected pre-unification state where
+    // cluster mode had every edge at full opacity by default. After the
+    // dendrogram-uniformity fix there MUST be NO lit cross-refs at idle.
+    expect(
+      buckets.crossRefLit,
+      `expected 0 lit cross-ref edges at idle (cluster mode now dims by default); got ${buckets.crossRefLit} lit, ${buckets.crossRefDim} dim`,
+    ).toBe(0);
+    // And at least SOME cross-refs should be dim — otherwise the test
+    // would silently pass on a fixture with no cross-refs at all.
+    if (buckets.crossRefDim === 0) {
+      test.info().annotations.push({
+        type: "note",
+        description: "fixture has no cross-ref edges to dim — partial coverage",
+      });
     }
   });
 
-  test("selecting a file triggers soft dim (~0.35) on unrelated edges", async ({
+  test("selecting a file lights touching edges; unrelated cross-refs stay dim", async ({
     page,
   }) => {
     await gotoFreshClusters(page);
     await expect(page.getByTestId("graph-canvas")).toBeVisible({ timeout: 10_000 });
 
     // Click the first file node we can find — that's enough to set
-    // selectedFileId and trigger the soft-dim path.
+    // selectedFileId and trigger the focus-light path.
     const fileSelected = await page.evaluate(() => {
       const file = document.querySelector(".react-flow__node-file");
       if (!file) return false;
@@ -175,20 +208,25 @@ test.describe("cluster-mode bezier edges (Bug #2)", () => {
     await page.waitForTimeout(200);
 
     const buckets = await page.evaluate(() => {
-      const edges = document.querySelectorAll(".react-flow__edge-path");
-      const out = { full: 0, soft: 0, other: 0 };
+      const edges = document.querySelectorAll(".react-flow__edge");
+      const out = { lit: 0, dim: 0, other: 0 };
       for (const e of edges) {
-        const s = e.getAttribute("style") || "";
+        // Skip hierarchy (smoothstep) — they have their own dim-on-focus
+        // story (0.4); we only care about the cross-ref dim/lit split here.
+        if (e.classList.contains("react-flow__edge-smoothstep")) continue;
+        const path = e.querySelector(".react-flow__edge-path");
+        if (!path) continue;
+        const s = path.getAttribute("style") || "";
         const m = s.match(/opacity:\s*([0-9.]+)/);
         const o = m ? parseFloat(m[1]) : 1;
-        if (o >= 0.99) out.full += 1;
-        else if (Math.abs(o - 0.35) < 0.05) out.soft += 1;
+        if (o >= 0.99) out.lit += 1;
+        else if (Math.abs(o - 0.15) < 0.05) out.dim += 1;
         else out.other += 1;
       }
       return out;
     });
 
-    if (buckets.full + buckets.soft + buckets.other === 0) {
+    if (buckets.lit + buckets.dim + buckets.other === 0) {
       test.info().annotations.push({
         type: "note",
         description: "no edges visible with selection — dim check no-op",
@@ -196,16 +234,17 @@ test.describe("cluster-mode bezier edges (Bug #2)", () => {
       return;
     }
 
-    // After selection, at least SOME edges should be in the soft-dim
-    // bucket (the unrelated cross-refs). At least SOME may still be full
-    // (the focused file's connections + hierarchy edges).
+    // After selection, at least SOME cross-refs should be dim (the
+    // unrelated ones not touching the selected file). Edges TOUCHING the
+    // selected file may light to full — that's fine, they just need to
+    // exist as a separate bucket.
     expect(
-      buckets.soft,
-      `expected some edges to soft-dim after selection; got full=${buckets.full} soft=${buckets.soft} other=${buckets.other}`,
+      buckets.dim,
+      `expected some unrelated cross-refs to remain dim after selection; got lit=${buckets.lit} dim=${buckets.dim} other=${buckets.other}`,
     ).toBeGreaterThan(0);
   });
 
-  test("Escape clears selection and restores full opacity to every edge", async ({
+  test("Escape clears selection and every cross-ref returns to dim baseline", async ({
     page,
   }) => {
     await gotoFreshClusters(page);
@@ -233,29 +272,27 @@ test.describe("cluster-mode bezier edges (Bug #2)", () => {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(200);
 
-    const opacities = await page.evaluate(() => {
-      const edges = document.querySelectorAll(".react-flow__edge-path");
-      return Array.from(edges).map((e) => {
-        const s = e.getAttribute("style") || "";
+    const litCrossRefs = await page.evaluate(() => {
+      const edges = document.querySelectorAll(".react-flow__edge");
+      let lit = 0;
+      for (const e of edges) {
+        // Only count cross-ref (bezier) edges; hierarchy is exempt.
+        if (e.classList.contains("react-flow__edge-smoothstep")) continue;
+        const path = e.querySelector(".react-flow__edge-path");
+        if (!path) continue;
+        const s = path.getAttribute("style") || "";
         const m = s.match(/opacity:\s*([0-9.]+)/);
-        return m ? parseFloat(m[1]) : 1;
-      });
+        const o = m ? parseFloat(m[1]) : 1;
+        if (o >= 0.99) lit += 1;
+      }
+      return lit;
     });
 
-    if (opacities.length === 0) {
-      test.info().annotations.push({
-        type: "note",
-        description: "fixture has no edges — Escape restoration no-op",
-      });
-      return;
-    }
-
-    // After Escape clears selection, every edge should be back to full.
-    for (const o of opacities) {
-      expect(
-        o,
-        "Escape should restore default full-opacity info-density",
-      ).toBeGreaterThanOrEqual(0.99);
-    }
+    // Post-unification: Escape returns the canvas to the dim baseline (NOT
+    // to "everything full opacity" like the old soft-dim story did).
+    expect(
+      litCrossRefs,
+      `expected 0 lit cross-refs after Escape; got ${litCrossRefs}`,
+    ).toBe(0);
   });
 });

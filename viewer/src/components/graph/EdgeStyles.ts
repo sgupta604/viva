@@ -162,93 +162,65 @@ export function shouldDisablePointerEvents(
 }
 
 /**
- * Focus + context dimming for cross-reference edges in flat (dendrogram/tree)
- * modes. User feedback 2026-04-22: in dense flat layouts, cross-ref edges
- * criss-cross sibling nodes and the eye can't trace which connects to what.
+ * Focus + context dimming for cross-reference edges. User feedback
+ * 2026-04-22: dendrogram mode's "dim by default, light up touching edges
+ * when a tile is focused" interaction is the gold standard. Apply the SAME
+ * pattern uniformly across all three layouts (dendrogram, tree, clusters)
+ * so navigation feels consistent — clusters previously kept everything full
+ * opacity and only soft-dimmed unrelated edges, which the user found noisy
+ * ("all of them are highlighted by default").
  *
- * Default state (no focus): cross-ref edges render at 0.15 opacity so the
- * dendrogram structure reads cleanly and references recede into a faint
- * lattice of "there are connections here, hover to investigate."
+ * Default state (no focus, in any mode): cross-ref edges render at 0.15
+ * opacity so the layout structure reads cleanly and references recede into
+ * a faint lattice of "there are connections here, hover to investigate."
  *
  * Focused state (hover OR selection on either endpoint): cross-ref edges
  * touching the focused node return to full opacity so the user can trace
  * what THIS node references and is referenced by.
  *
- * Hierarchy (`d-aggregate`) edges always render full opacity — they're the
- * tree's backbone, dimming them would break the visual structure.
+ * Hierarchy (`d-aggregate`) edges always render full opacity here — they're
+ * structural backbone. Hierarchy backbone dimming-on-focus is handled by
+ * `hierarchyOpacityFor` (it dims to 0.4 when something else is focused so
+ * the lit cross-refs own the foreground).
  *
- * Cluster mode is intentionally untouched (caller passes `isFlatMode=false`)
- * because the user explicitly values cluster mode as the dense info-rich
- * alternative; dimming there would erase information they want.
+ * Pure helper — same `(kind, isFocused)` always returns the same opacity.
+ * Exported for the GraphCanvas edge mapper AND for tests.
  *
- * Pure helper — same `(kind, isFlatMode, isFocused)` always returns the same
- * opacity. Exported for the GraphCanvas edge mapper AND for tests.
+ * The legacy `isFlatMode` and `anythingFocused` parameters are accepted but
+ * ignored. They're retained for backward compat with any older test sites
+ * still passing 3 or 4 args; new call sites should pass `(kind, isFocused)`
+ * (the unused params default to `false`).
  */
 export const CROSSREF_DIM_OPACITY = 0.15;
 export const CROSSREF_FULL_OPACITY = 1;
-/**
- * Cluster-mode "soft dim" for non-focused cross-ref edges. Bug #2 (image #17,
- * 2026-04-22): cluster mode at scale (the user's ~2,250-file Coder codebase)
- * showed straight smoothstep edges criss-crossing every cluster box — the
- * canvas became an unreadable grid of orthogonal lines. The visual fix is
- * twofold:
- *
- *  1. **Bezier curves for cluster-mode cross-refs** (GraphCanvas change) —
- *     curves arc around obstacles instead of slicing through them.
- *  2. **Soft focus dim** (this constant) — when ANY node is hovered or
- *     selected, NON-touching cross-ref edges fade to ~35% opacity. The
- *     cluster-mode info-density the user explicitly praised stays present
- *     in the default state (no node focused = every edge full color), but
- *     the user can investigate by hovering/selecting and the focused
- *     subgraph pops out of the lattice.
- *
- * Why 0.35 (vs the 0.15 flat-mode dim): cluster mode keeps the full per-kind
- * palette and aggregated `×N` chips. A 0.15 dim would make those chips
- * unreadable and erase the per-kind color information the user values.
- * 0.35 is enough to push unrelated edges visually behind the focused ones
- * while preserving the chip + per-kind color cues at-a-glance.
- */
-export const CROSSREF_CLUSTER_SOFT_DIM_OPACITY = 0.35;
 
 export function crossRefOpacityFor(
   kind: EdgeKind,
-  isFlatMode: boolean,
+  // Legacy positional-arg slot (was `isFlatMode`). Kept so existing test
+  // call sites compile; the helper's behavior no longer branches on mode.
+  _isFlatMode: boolean,
   isFocused: boolean,
-  /**
-   * "Anything focused" — true when ANY node in the graph is currently
-   * hovered or selected. Drives cluster-mode soft dimming: cluster-mode
-   * edges only dim when the user IS investigating something.
-   *
-   * Optional for backward-compat: callers (and tests) that don't pass it
-   * default to `false`, which preserves the pre-Bug-#2 cluster behavior
-   * (always full opacity).
-   */
-  anythingFocused: boolean = false,
+  // Legacy positional-arg slot (was `anythingFocused`, drove the old cluster
+  // soft-dim path). Cluster mode now matches the dendrogram pattern, so this
+  // flag is irrelevant — kept only so legacy 4-arg call sites still type-check.
+  _anythingFocused: boolean = false,
 ): number {
-  // Hierarchy edges in any mode: never dim — the tree backbone needs to
-  // stay visible.
+  // Hierarchy edges in any mode: never participate in the cross-ref dim
+  // path. Their dim-on-focus behavior lives in `hierarchyOpacityFor`.
   if (kind === "d-aggregate") return CROSSREF_FULL_OPACITY;
-  // Flat modes (dendrogram / tree): hard 0.15 dim by default, full when
-  // this edge's endpoint is focused.
-  if (isFlatMode) {
-    return isFocused ? CROSSREF_FULL_OPACITY : CROSSREF_DIM_OPACITY;
-  }
-  // Cluster mode: soft 0.35 dim ONLY when something else is focused. With
-  // nothing focused, every edge stays full opacity — the dense info-rich
-  // default the user praised. With a node focused, edges touching that
-  // node stay full and others recede so the focused subgraph pops out.
-  if (anythingFocused && !isFocused) return CROSSREF_CLUSTER_SOFT_DIM_OPACITY;
-  return CROSSREF_FULL_OPACITY;
+  // Uniform behavior across all modes: dim by default, full when THIS edge's
+  // endpoint is focused.
+  return isFocused ? CROSSREF_FULL_OPACITY : CROSSREF_DIM_OPACITY;
 }
 
 /**
  * Hit-target width for an edge's invisible interaction layer (React Flow's
  * `interactionWidth` prop — defaults to 20px). When a cross-ref edge is
- * dimmed to 0.15 opacity in a flat layout, its visible stroke is barely
- * perceptible but the 20px-wide interaction overlay still intercepts every
- * pointer event passing through it. That broke node-hover the user expects:
- * trying to hover a file behind a faint edge silently failed because the
- * edge's hit-zone ate the move.
+ * dimmed to 0.15 opacity, its visible stroke is barely perceptible but the
+ * 20px-wide interaction overlay still intercepts every pointer event passing
+ * through it. That broke node-hover the user expects: trying to hover a file
+ * behind a faint edge silently failed because the edge's hit-zone ate the
+ * move.
  *
  * Fix: when the edge is dimmed, drop its interaction width to 0. The visible
  * path stays drawn (so the dim hint of "there's a connection here" persists),
@@ -256,29 +228,27 @@ export function crossRefOpacityFor(
  * (hover/select on either endpoint) it returns to the default 20px hit-zone
  * so the user can click the now-bright edge to inspect it.
  *
- * Cluster mode and hierarchy edges are unaffected — they never dim in the
- * first place, so their hit-target stays at the React Flow default.
+ * Hierarchy (`d-aggregate`) edges keep their full hit-zone in every mode —
+ * they don't participate in the cross-ref dim path.
  *
- * Pure helper, exported for the GraphCanvas edge mapper AND for tests.
+ * Pure helper, exported for the GraphCanvas edge mapper AND for tests. The
+ * `isFlatMode` parameter is retained for backward-compat call sites; the
+ * helper no longer branches on mode now that cluster mode matches the
+ * dendrogram dim-by-default pattern.
  */
 export const CROSSREF_INTERACTION_WIDTH_FOCUSED = 20;
 export const CROSSREF_INTERACTION_WIDTH_DIMMED = 0;
 
 export function crossRefInteractionWidthFor(
   kind: EdgeKind,
-  isFlatMode: boolean,
+  // Legacy positional slot (was `isFlatMode`). Ignored — uniform behavior now.
+  _isFlatMode: boolean,
   isFocused: boolean,
 ): number {
-  // Mirror crossRefOpacityFor's exemption rules so the two stay in lockstep:
-  // an edge that doesn't dim must keep its hit-zone, otherwise we'd silently
-  // make permanently-bright edges unclickable.
-  //
-  // Cluster-mode soft dim (0.35, Bug #2) deliberately KEEPS the hit-zone
-  // open. The edge is still very visible at 0.35 opacity (vs the 0.15 hard
-  // dim in flat modes that genuinely fades to a hint), so a click on it is
-  // still a meaningful user action — pulling the hit-zone away there would
-  // make focused-state navigation harder, not easier.
-  if (!isFlatMode) return CROSSREF_INTERACTION_WIDTH_FOCUSED;
+  // Mirror crossRefOpacityFor: an edge that doesn't dim must keep its
+  // hit-zone, otherwise we'd silently make permanently-bright edges
+  // unclickable. d-aggregate hierarchy edges never dim, so their hit-zone
+  // stays open in every mode.
   if (kind === "d-aggregate") return CROSSREF_INTERACTION_WIDTH_FOCUSED;
   return isFocused
     ? CROSSREF_INTERACTION_WIDTH_FOCUSED
@@ -330,39 +300,34 @@ export function focusedCrossRefStrokeFor(
 }
 
 /**
- * Hierarchy backbone dim-on-focus (Bug #4 fix, 2026-04-22). User feedback:
- * when a node is hovered or selected in flat mode, the lit cross-refs need
- * to own the foreground. The full-opacity slate hierarchy backbone competes
- * for attention even though it's already a low-contrast color; dropping it
- * to ~40% opacity keeps the tree spine visible as context but lets the
- * focused per-kind cross-refs pop.
+ * Hierarchy backbone dim-on-focus. User feedback 2026-04-22: when a node is
+ * focused, lit cross-refs need to own the foreground. The full-opacity
+ * hierarchy backbone competes for attention even though it's a low-contrast
+ * color; dropping it to ~40% opacity keeps the spine visible as context but
+ * lets the focused per-kind cross-refs pop.
  *
  * Default state (no focus): hierarchy renders at full opacity — the
  * backbone is the primary structure cue and must read clearly.
  *
- * Focused state (any node hovered or selected in flat mode): hierarchy
- * dims to 0.4 — visible enough to ground the focused subgraph in the tree's
- * structure, faint enough to recede behind the lit cross-refs.
+ * Focused state (any node hovered or selected): hierarchy dims to 0.4 —
+ * visible enough to ground the focused subgraph in the tree's structure,
+ * faint enough to recede behind the lit cross-refs. Applied uniformly in
+ * every mode now: in cluster mode the d-aggregate edges between cluster
+ * boxes and their drop-in files are still legitimate "structural backbone"
+ * worth dimming when the user is investigating a specific node, so the
+ * dendrogram pattern carries over cleanly.
  *
- * Cluster mode: hierarchy is expressed via containment, not edges, so the
- * helper short-circuits to full opacity — cluster-mode `d-aggregate` edges
- * (when present) keep their normal weight.
- *
- * Mirrors the `(isFlatMode, isFocused)` shape of the cross-ref helpers
- * for the lockstep guard. Note this helper takes only the two flag args
- * since hierarchy dimming is per-mode, not per-kind — it's only ever
- * applied to `d-aggregate` edges by the caller.
+ * The legacy `isFlatMode` parameter is accepted but ignored. Retained so
+ * existing call sites compile during the cluster-mode unification.
  */
 export const HIERARCHY_DIM_OPACITY = 0.4;
 export const HIERARCHY_FULL_OPACITY = 1;
 
 export function hierarchyOpacityFor(
-  isFlatMode: boolean,
+  // Legacy positional slot (was `isFlatMode`). Ignored — uniform behavior now.
+  _isFlatMode: boolean,
   isFocused: boolean,
 ): number {
-  // Cluster mode never dims hierarchy — and cluster mode rarely renders
-  // d-aggregate edges anyway since containment carries the relationship.
-  if (!isFlatMode) return HIERARCHY_FULL_OPACITY;
   return isFocused ? HIERARCHY_DIM_OPACITY : HIERARCHY_FULL_OPACITY;
 }
 

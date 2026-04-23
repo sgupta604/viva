@@ -185,6 +185,15 @@ export function GraphCanvas() {
           parentNode: n.parent ?? undefined,
           extent: n.parent ? ("parent" as const) : undefined,
           position: { x: n.x, y: n.y },
+          // zIndex: 1100 lifts cluster cards above the edge layer (zIndex
+          // 1000) — same rationale as treeFolder/treeFile in dendrogram
+          // mode. The user's 2026-04-22 feedback noted that cross-ref edges
+          // should pass UNDER tiles ("they go under other tiles"), and now
+          // that cluster mode also lights edges on focus the same z-order
+          // contract has to apply here. Without this, lit per-kind cross-
+          // refs at zIndex 1000 would draw across cluster headers and bleed
+          // through their semi-transparent expanded body fill.
+          zIndex: 1100,
           data: {
             cluster: n.cluster!,
             expanded: n.expanded!,
@@ -253,6 +262,14 @@ export function GraphCanvas() {
         parentNode: n.parent ?? undefined,
         extent: n.parent ? ("parent" as const) : undefined,
         position: { x: n.x, y: n.y },
+        // zIndex: 1100 lifts cluster-mode file tiles above the edge layer
+        // (zIndex 1000) so cross-ref edges pass UNDER tiles per the user's
+        // 2026-04-22 feedback. Mirrors treeFile in dendrogram mode and the
+        // cluster z-index bump above. Without this, lit per-kind cross-refs
+        // would draw across the file card body when its connections are
+        // focused, making the tile harder to read in the exact moment the
+        // user is focusing on it.
+        zIndex: 1100,
         data: { file: n.file! },
         selected: n.id === selectedFileId,
       };
@@ -315,13 +332,12 @@ export function GraphCanvas() {
         e.kind,
         isFlatMode,
       );
-      // Focus + context dimming (user feedback 2026-04-22, post-images
-      // #13/#14): cross-ref edges in flat modes recede to ~15% opacity
-      // unless the hovered or selected node is one of their endpoints.
-      // Hierarchy edges and cluster mode are exempt — see crossRefOpacityFor
-      // for the per-mode rules. Computed per-edge inside this useMemo so a
-      // hover state change triggers ONE re-map (cheap; flat-mode edge counts
-      // are bounded by the visible-node fan-out).
+      // Focus + context dimming (user feedback 2026-04-22): cross-ref edges
+      // recede to ~15% opacity in EVERY mode (dendrogram, tree, clusters)
+      // unless the hovered or selected node is one of their endpoints. The
+      // dendrogram pattern is now applied uniformly across all three layouts
+      // because the user explicitly asked for cluster mode to match: edges
+      // greyed out by default, lit only when their tile is focused.
       //
       // Selection counts as "focused" right alongside hover so that opening
       // a file's detail panel keeps that file's connections lit even after
@@ -334,15 +350,17 @@ export function GraphCanvas() {
       const isFocused =
         focusedNodeId !== null &&
         (e.source === focusedNodeId || e.target === focusedNodeId);
-      // "Anything focused" — ANY node in the graph is focused (hovered or
-      // selected). Used by hierarchyOpacityFor to dim the backbone whenever
-      // the user is investigating something, regardless of whether THIS
-      // hierarchy edge touches it.
+      // "Anything focused" — ANY node in the graph is focused. Drives
+      // hierarchy backbone dim-on-focus: the spine recedes whenever the
+      // user is investigating, regardless of whether THIS hierarchy edge
+      // touches the focused node.
       const anythingFocused = focusedNodeId !== null;
       const isHierarchyKind = e.kind === "d-aggregate";
-      // Hierarchy edges use hierarchyOpacityFor (dim backbone on focus).
-      // Cross-ref edges use crossRefOpacityFor (dim by default, lit when
-      // touching the focused node).
+      // Hierarchy edges dim to 0.4 when something is focused (backbone
+      // recedes behind the lit cross-refs). Cross-ref edges dim to 0.15 by
+      // default and light to full opacity when their endpoint is focused.
+      // The `isFlatMode` arg is now a legacy positional slot — both helpers
+      // ignore it and behave uniformly across all modes.
       const opacity = isHierarchyKind
         ? hierarchyOpacityFor(isFlatMode, anythingFocused)
         : crossRefOpacityFor(e.kind, isFlatMode, isFocused, anythingFocused);

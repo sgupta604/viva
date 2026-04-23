@@ -14,7 +14,6 @@ import {
   crossRefInteractionWidthFor,
   CROSSREF_INTERACTION_WIDTH_DIMMED,
   CROSSREF_INTERACTION_WIDTH_FOCUSED,
-  CROSSREF_CLUSTER_SOFT_DIM_OPACITY,
   focusedCrossRefStrokeFor,
   hierarchyOpacityFor,
   HIERARCHY_DIM_OPACITY,
@@ -207,24 +206,41 @@ describe("shouldDisablePointerEvents (flat-mode hierarchy decoration)", () => {
   });
 });
 
-describe("crossRefOpacityFor (focus + context dimming)", () => {
-  // INVARIANT LOCK: in flat (dendrogram/tree) modes, cross-ref edges dim by
-  // default and light up when their endpoint is hovered/selected. Cluster
-  // mode is intentionally untouched (user values cluster info-density), and
-  // the d-aggregate hierarchy backbone never dims in any mode.
-  it("dims cross-ref kinds in flat mode when nothing is focused", () => {
+describe("crossRefOpacityFor (uniform focus + context dimming)", () => {
+  // INVARIANT LOCK (post-cluster-unification, 2026-04-22): cross-ref edges
+  // dim to 0.15 by default and light to full opacity ONLY when their
+  // endpoint is hovered/selected. The behavior is uniform across every
+  // mode (dendrogram, tree, clusters) per the user's "do it like you did
+  // for dendrogram" feedback. The d-aggregate hierarchy backbone is the
+  // sole exception — its dim-on-focus story lives in `hierarchyOpacityFor`.
+
+  it("dims cross-ref kinds when nothing is focused (every mode)", () => {
     for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      // Flat mode (isFlatMode=true).
       expect(crossRefOpacityFor(k, true, false)).toBe(CROSSREF_DIM_OPACITY);
+      // Cluster mode (isFlatMode=false). Used to return FULL here under the
+      // old soft-dim story; the user explicitly rejected that ("all of them
+      // are highlighted by default").
+      expect(crossRefOpacityFor(k, false, false)).toBe(CROSSREF_DIM_OPACITY);
+      // Legacy 4-arg shape: anythingFocused must NOT change the answer for
+      // a non-focused edge — the whole point of the unification is that the
+      // dim baseline is the SAME whether the user is investigating or not.
+      expect(crossRefOpacityFor(k, false, false, true)).toBe(CROSSREF_DIM_OPACITY);
+      expect(crossRefOpacityFor(k, true, false, true)).toBe(CROSSREF_DIM_OPACITY);
     }
   });
 
-  it("returns full opacity for cross-ref kinds in flat mode when focused", () => {
+  it("returns full opacity for cross-ref kinds when focused (every mode)", () => {
     for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
       expect(crossRefOpacityFor(k, true, true)).toBe(CROSSREF_FULL_OPACITY);
+      expect(crossRefOpacityFor(k, false, true)).toBe(CROSSREF_FULL_OPACITY);
     }
   });
 
-  it("never dims hierarchy (d-aggregate) edges, focused or not, in any mode", () => {
+  it("never dims hierarchy (d-aggregate) edges via the cross-ref helper, in any mode", () => {
+    // d-aggregate is structural backbone — dim-on-focus for it lives in
+    // hierarchyOpacityFor (which dims to 0.4 when something is focused),
+    // not here. crossRefOpacityFor must return full for it in every state.
     expect(crossRefOpacityFor("d-aggregate", true, false)).toBe(
       CROSSREF_FULL_OPACITY,
     );
@@ -234,31 +250,28 @@ describe("crossRefOpacityFor (focus + context dimming)", () => {
     expect(crossRefOpacityFor("d-aggregate", false, false)).toBe(
       CROSSREF_FULL_OPACITY,
     );
-  });
-
-  it("never dims cross-ref kinds in cluster mode when nothing is focused (default info-density preserved)", () => {
-    // Cluster mode default state (no node hovered or selected): every
-    // cross-ref edge stays full opacity so the dense info-rich palette the
-    // user explicitly praised is preserved at idle.
-    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
-      // Both legacy 3-arg shape (anythingFocused defaults to false) and
-      // explicit-false 4-arg shape must return full opacity.
-      expect(crossRefOpacityFor(k, false, false)).toBe(CROSSREF_FULL_OPACITY);
-      expect(crossRefOpacityFor(k, false, true)).toBe(CROSSREF_FULL_OPACITY);
-      expect(crossRefOpacityFor(k, false, false, false)).toBe(CROSSREF_FULL_OPACITY);
-      expect(crossRefOpacityFor(k, false, true, false)).toBe(CROSSREF_FULL_OPACITY);
-    }
-  });
-
-  it("never dims hierarchy in cluster mode regardless of focus", () => {
-    // d-aggregate stays full opacity even when something else is focused —
-    // it's structural backbone, not semantic info.
+    expect(crossRefOpacityFor("d-aggregate", false, true)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
+    // Legacy 4-arg call sites with anythingFocused — same answer.
     expect(crossRefOpacityFor("d-aggregate", false, false, true)).toBe(
       CROSSREF_FULL_OPACITY,
     );
-    expect(crossRefOpacityFor("d-aggregate", false, true, true)).toBe(
-      CROSSREF_FULL_OPACITY,
-    );
+  });
+
+  it("ignores the legacy isFlatMode positional arg (uniform behavior across modes)", () => {
+    // Regression guard: the helper used to branch on isFlatMode (cluster
+    // mode kept everything full, flat mode dimmed). The user's cluster
+    // unification feedback removed that branch — verify by asserting the
+    // SAME (isFocused) input yields the SAME opacity regardless of the
+    // legacy mode flag.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      for (const isFocused of [true, false] as const) {
+        const flat = crossRefOpacityFor(k, true, isFocused);
+        const cluster = crossRefOpacityFor(k, false, isFocused);
+        expect(flat).toBe(cluster);
+      }
+    }
   });
 
   it("dim opacity is around 15% — visible enough to hint at structure, faint enough to recede", () => {
@@ -266,49 +279,6 @@ describe("crossRefOpacityFor (focus + context dimming)", () => {
     // single deliberate test edit, not a silent UX shift.
     expect(CROSSREF_DIM_OPACITY).toBe(0.15);
     expect(CROSSREF_FULL_OPACITY).toBe(1);
-  });
-});
-
-describe("crossRefOpacityFor — cluster-mode soft dim (Bug #2)", () => {
-  // INVARIANT LOCK: cluster mode dims unrelated cross-ref edges to ~35%
-  // ONLY when something is focused (hover or selection). Default state with
-  // nothing focused stays full opacity per the user's "cluster info-density
-  // is fine" verdict. The dim is softer than flat-mode (0.35 vs 0.15) to
-  // preserve the per-kind color cues + aggregated `xN` chips at-a-glance.
-
-  it("dims unrelated cross-refs to soft dim when something else is focused", () => {
-    // anythingFocused=true, isFocused=false (this edge does NOT touch the
-    // focused node) → soft dim.
-    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
-      expect(crossRefOpacityFor(k, false, false, true)).toBe(
-        CROSSREF_CLUSTER_SOFT_DIM_OPACITY,
-      );
-    }
-  });
-
-  it("keeps focused cross-refs full opacity in cluster mode", () => {
-    // anythingFocused=true, isFocused=true (this edge DOES touch the
-    // focused node) → stays full opacity so the focused subgraph pops out.
-    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
-      expect(crossRefOpacityFor(k, false, true, true)).toBe(CROSSREF_FULL_OPACITY);
-    }
-  });
-
-  it("soft dim opacity is around 35% — preserves per-kind color cues vs flat-mode hard dim", () => {
-    // Lock the literal so a future "make it more / less aggressive" tweak
-    // is a single deliberate test edit. Chose 0.35 (vs flat-mode 0.15)
-    // because cluster mode keeps the full per-kind palette + aggregated
-    // chips and we don't want them washing out completely on focus.
-    expect(CROSSREF_CLUSTER_SOFT_DIM_OPACITY).toBe(0.35);
-  });
-
-  it("hierarchy never participates in soft dim (stays full opacity always)", () => {
-    expect(crossRefOpacityFor("d-aggregate", false, false, true)).toBe(
-      CROSSREF_FULL_OPACITY,
-    );
-    expect(crossRefOpacityFor("d-aggregate", false, true, true)).toBe(
-      CROSSREF_FULL_OPACITY,
-    );
   });
 });
 
@@ -349,22 +319,26 @@ describe("crossRefInteractionWidthFor (hit-target tracks visible opacity)", () =
     );
   });
 
-  it("never collapses hit-zone in cluster mode (no dimming there)", () => {
-    for (const k of [
-      "include",
-      "ref",
-      "import",
-      "xsd",
-      "logical-id",
-      "d-aggregate",
-    ] as const) {
+  it("collapses cross-ref hit-zone in cluster mode too when not focused (post-unification)", () => {
+    // Cluster mode now dims like flat mode (user feedback 2026-04-22), so
+    // the hit-zone story has to follow: a 0.15-opacity edge is hard to
+    // see and shouldn't eat pointer events that the user intends for the
+    // file tile underneath. Hierarchy edges still keep their hit-zone.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
       expect(crossRefInteractionWidthFor(k, false, false)).toBe(
-        CROSSREF_INTERACTION_WIDTH_FOCUSED,
+        CROSSREF_INTERACTION_WIDTH_DIMMED,
       );
       expect(crossRefInteractionWidthFor(k, false, true)).toBe(
         CROSSREF_INTERACTION_WIDTH_FOCUSED,
       );
     }
+    // d-aggregate hit-zone never collapses (it never dims).
+    expect(crossRefInteractionWidthFor("d-aggregate", false, false)).toBe(
+      CROSSREF_INTERACTION_WIDTH_FOCUSED,
+    );
+    expect(crossRefInteractionWidthFor("d-aggregate", false, true)).toBe(
+      CROSSREF_INTERACTION_WIDTH_FOCUSED,
+    );
   });
 
   it("focused-width matches the React Flow default (20)", () => {
@@ -464,22 +438,33 @@ describe("focusedCrossRefStrokeFor (focus-revealed per-kind palette)", () => {
   });
 });
 
-describe("hierarchyOpacityFor (Bug #4 — backbone dim on focus)", () => {
-  // INVARIANT: when a node is focused in a flat layout, the slate hierarchy
-  // backbone dims to 0.4 so the lit per-kind cross-refs own the foreground.
-  // Cluster mode never dims (containment carries the relationship).
+describe("hierarchyOpacityFor (uniform backbone dim on focus)", () => {
+  // INVARIANT (post-cluster-unification, 2026-04-22): when a node is
+  // focused, the hierarchy backbone dims to 0.4 so the lit per-kind cross-
+  // refs own the foreground. Behavior is uniform across every mode now —
+  // the cluster-mode `d-aggregate` edges connecting cluster boxes to their
+  // drop-in files are still legitimate "structural backbone" worth dimming
+  // when the user is investigating a specific node.
 
-  it("dims hierarchy in flat mode when a node is focused", () => {
+  it("dims hierarchy when a node is focused (every mode)", () => {
     expect(hierarchyOpacityFor(true, true)).toBe(HIERARCHY_DIM_OPACITY);
+    expect(hierarchyOpacityFor(false, true)).toBe(HIERARCHY_DIM_OPACITY);
   });
 
-  it("renders hierarchy at full opacity in flat mode when nothing is focused", () => {
+  it("renders hierarchy at full opacity when nothing is focused (every mode)", () => {
     expect(hierarchyOpacityFor(true, false)).toBe(HIERARCHY_FULL_OPACITY);
+    expect(hierarchyOpacityFor(false, false)).toBe(HIERARCHY_FULL_OPACITY);
   });
 
-  it("never dims hierarchy in cluster mode (focused or not)", () => {
-    expect(hierarchyOpacityFor(false, true)).toBe(HIERARCHY_FULL_OPACITY);
-    expect(hierarchyOpacityFor(false, false)).toBe(HIERARCHY_FULL_OPACITY);
+  it("ignores the legacy isFlatMode positional arg (uniform behavior across modes)", () => {
+    // Regression guard: helper used to short-circuit cluster mode to full
+    // opacity. The unification removed that branch — same isFocused must
+    // yield same opacity regardless of the mode flag.
+    for (const isFocused of [true, false] as const) {
+      expect(hierarchyOpacityFor(true, isFocused)).toBe(
+        hierarchyOpacityFor(false, isFocused),
+      );
+    }
   });
 
   it("dim opacity is 0.4 — visible enough as backbone, faint enough to recede", () => {
@@ -552,31 +537,27 @@ describe("focus-state lockstep across all four edge helpers", () => {
     }
   });
 
-  it("hierarchy backbone dims iff something is focused in flat mode (mirrors cross-ref focus rule)", () => {
+  it("hierarchy backbone dims iff something is focused (uniform across modes)", () => {
     // hierarchyOpacityFor doesn't take a kind — it's only ever called for
-    // d-aggregate. Its `isFocused` flag is the SAME flag the cross-ref
-    // helpers see (any node in the graph is hovered/selected). Verify the
-    // dim/full split agrees with the cross-ref helpers' notion of "the user
-    // is focusing on something."
+    // d-aggregate. Post-cluster-unification, hierarchy dim and cross-ref
+    // light-up share the SAME notion of "something is focused" in EVERY
+    // mode. Pair them up exhaustively.
     for (const isFlat of [true, false] as const) {
       for (const isFocused of [true, false] as const) {
         const hOpacity = hierarchyOpacityFor(isFlat, isFocused);
-        // Pick a representative cross-ref kind to derive the focus state
-        // from the cross-ref helpers; any kind would do since they all
-        // agree (covered above).
+        // Pick a representative cross-ref kind. Use isFocused as both the
+        // "this edge is touching focus" AND "anything is focused" signal —
+        // sufficient because the cross-ref helper ignores anythingFocused
+        // post-unification (the dim baseline is uniform).
         const xrefOpacity = crossRefOpacityFor("include", isFlat, isFocused);
         const xrefIsLit = xrefOpacity === CROSSREF_FULL_OPACITY;
-        if (isFlat && isFocused) {
-          // Cross-refs lit (touching focused node would be) AND backbone dimmed.
+        if (isFocused) {
+          // Touched cross-ref lit AND backbone dimmed — same in flat AND cluster.
           expect(xrefIsLit).toBe(true);
           expect(hOpacity).toBe(HIERARCHY_DIM_OPACITY);
-        } else if (isFlat && !isFocused) {
-          // Default flat: cross-refs dim, backbone full.
-          expect(xrefIsLit).toBe(false);
-          expect(hOpacity).toBe(HIERARCHY_FULL_OPACITY);
         } else {
-          // Cluster mode: nothing dims.
-          expect(xrefIsLit).toBe(true);
+          // Default state: cross-refs dim, backbone full — same in flat AND cluster.
+          expect(xrefIsLit).toBe(false);
           expect(hOpacity).toBe(HIERARCHY_FULL_OPACITY);
         }
       }
