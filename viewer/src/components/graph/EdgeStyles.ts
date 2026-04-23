@@ -186,17 +186,59 @@ export function shouldDisablePointerEvents(
  */
 export const CROSSREF_DIM_OPACITY = 0.15;
 export const CROSSREF_FULL_OPACITY = 1;
+/**
+ * Cluster-mode "soft dim" for non-focused cross-ref edges. Bug #2 (image #17,
+ * 2026-04-22): cluster mode at scale (the user's ~2,250-file Coder codebase)
+ * showed straight smoothstep edges criss-crossing every cluster box — the
+ * canvas became an unreadable grid of orthogonal lines. The visual fix is
+ * twofold:
+ *
+ *  1. **Bezier curves for cluster-mode cross-refs** (GraphCanvas change) —
+ *     curves arc around obstacles instead of slicing through them.
+ *  2. **Soft focus dim** (this constant) — when ANY node is hovered or
+ *     selected, NON-touching cross-ref edges fade to ~35% opacity. The
+ *     cluster-mode info-density the user explicitly praised stays present
+ *     in the default state (no node focused = every edge full color), but
+ *     the user can investigate by hovering/selecting and the focused
+ *     subgraph pops out of the lattice.
+ *
+ * Why 0.35 (vs the 0.15 flat-mode dim): cluster mode keeps the full per-kind
+ * palette and aggregated `×N` chips. A 0.15 dim would make those chips
+ * unreadable and erase the per-kind color information the user values.
+ * 0.35 is enough to push unrelated edges visually behind the focused ones
+ * while preserving the chip + per-kind color cues at-a-glance.
+ */
+export const CROSSREF_CLUSTER_SOFT_DIM_OPACITY = 0.35;
 
 export function crossRefOpacityFor(
   kind: EdgeKind,
   isFlatMode: boolean,
   isFocused: boolean,
+  /**
+   * "Anything focused" — true when ANY node in the graph is currently
+   * hovered or selected. Drives cluster-mode soft dimming: cluster-mode
+   * edges only dim when the user IS investigating something.
+   *
+   * Optional for backward-compat: callers (and tests) that don't pass it
+   * default to `false`, which preserves the pre-Bug-#2 cluster behavior
+   * (always full opacity).
+   */
+  anythingFocused: boolean = false,
 ): number {
-  // Cluster mode: never dim. Hierarchy edges in any mode: never dim — the
-  // tree backbone needs to stay visible.
-  if (!isFlatMode) return CROSSREF_FULL_OPACITY;
+  // Hierarchy edges in any mode: never dim — the tree backbone needs to
+  // stay visible.
   if (kind === "d-aggregate") return CROSSREF_FULL_OPACITY;
-  return isFocused ? CROSSREF_FULL_OPACITY : CROSSREF_DIM_OPACITY;
+  // Flat modes (dendrogram / tree): hard 0.15 dim by default, full when
+  // this edge's endpoint is focused.
+  if (isFlatMode) {
+    return isFocused ? CROSSREF_FULL_OPACITY : CROSSREF_DIM_OPACITY;
+  }
+  // Cluster mode: soft 0.35 dim ONLY when something else is focused. With
+  // nothing focused, every edge stays full opacity — the dense info-rich
+  // default the user praised. With a node focused, edges touching that
+  // node stay full and others recede so the focused subgraph pops out.
+  if (anythingFocused && !isFocused) return CROSSREF_CLUSTER_SOFT_DIM_OPACITY;
+  return CROSSREF_FULL_OPACITY;
 }
 
 /**
@@ -230,6 +272,12 @@ export function crossRefInteractionWidthFor(
   // Mirror crossRefOpacityFor's exemption rules so the two stay in lockstep:
   // an edge that doesn't dim must keep its hit-zone, otherwise we'd silently
   // make permanently-bright edges unclickable.
+  //
+  // Cluster-mode soft dim (0.35, Bug #2) deliberately KEEPS the hit-zone
+  // open. The edge is still very visible at 0.35 opacity (vs the 0.15 hard
+  // dim in flat modes that genuinely fades to a hint), so a click on it is
+  // still a meaningful user action — pulling the hit-zone away there would
+  // make focused-state navigation harder, not easier.
   if (!isFlatMode) return CROSSREF_INTERACTION_WIDTH_FOCUSED;
   if (kind === "d-aggregate") return CROSSREF_INTERACTION_WIDTH_FOCUSED;
   return isFocused

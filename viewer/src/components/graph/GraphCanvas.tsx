@@ -345,7 +345,7 @@ export function GraphCanvas() {
       // touching the focused node).
       const opacity = isHierarchyKind
         ? hierarchyOpacityFor(isFlatMode, anythingFocused)
-        : crossRefOpacityFor(e.kind, isFlatMode, isFocused);
+        : crossRefOpacityFor(e.kind, isFlatMode, isFocused, anythingFocused);
       // Hit-target width must shrink in lockstep with the visible opacity
       // (user QA 2026-04-22): React Flow's invisible 20px-wide
       // `react-flow__edge-interaction` overlay was eating pointer events for
@@ -369,14 +369,27 @@ export function GraphCanvas() {
       const stroke = e.unresolved
         ? style.stroke
         : focusedCrossRefStrokeFor(e.kind, isFlatMode, isFocused);
-      // Bezier curves for cross-ref edges in flat modes (Change 2): the
-      // smoothstep orthogonal routing inherited from elkjs's mrtree was the
-      // visual culprit behind images #13/#14 — straight horizontal/vertical
-      // segments through sibling rows. Bezier curves arc away from the
-      // tree's main axes and naturally avoid passing through node bodies.
-      // Hierarchy edges KEEP smoothstep so the tree backbone stays crisp
-      // and rectilinear; cluster mode is unchanged.
-      const useBezier = isFlatMode && e.kind !== "d-aggregate";
+      // Bezier curves for cross-ref edges in BOTH cluster and flat modes:
+      //
+      //  - Flat modes (dendrogram, tree, Change 2 — 2026-04-22): the
+      //    smoothstep orthogonal routing inherited from elkjs's mrtree was
+      //    the visual culprit behind images #13/#14 — straight horizontal/
+      //    vertical segments through sibling rows. Bezier curves arc away
+      //    from the tree's main axes and naturally avoid passing through
+      //    node bodies. Hierarchy edges (`d-aggregate`) keep smoothstep so
+      //    the tree backbone stays crisp and rectilinear.
+      //
+      //  - Cluster mode (Bug #2 fix, 2026-04-22 — image #17): straight
+      //    smoothstep edges at scale (the user's ~2,250-file Coder
+      //    codebase) crisscrossed every cluster box and made the canvas
+      //    unreadable. Bezier curves arc around obstacles and dramatically
+      //    reduce the "line slicing through unrelated tile" problem. Plus
+      //    the soft focus dim (`crossRefOpacityFor`'s `anythingFocused`
+      //    branch) lets the user push unrelated edges back when
+      //    investigating a single node. d-aggregate edges in cluster mode
+      //    are vanishingly rare (containment carries the relationship), so
+      //    the same `kind !== "d-aggregate"` guard is a near-no-op there.
+      const useBezier = e.kind !== "d-aggregate";
       return {
         id: e.id,
         source: e.source,

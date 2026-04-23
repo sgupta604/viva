@@ -14,6 +14,7 @@ import {
   crossRefInteractionWidthFor,
   CROSSREF_INTERACTION_WIDTH_DIMMED,
   CROSSREF_INTERACTION_WIDTH_FOCUSED,
+  CROSSREF_CLUSTER_SOFT_DIM_OPACITY,
   focusedCrossRefStrokeFor,
   hierarchyOpacityFor,
   HIERARCHY_DIM_OPACITY,
@@ -235,18 +236,29 @@ describe("crossRefOpacityFor (focus + context dimming)", () => {
     );
   });
 
-  it("never dims any kind in cluster mode (info-density preserved)", () => {
-    for (const k of [
-      "include",
-      "ref",
-      "import",
-      "xsd",
-      "logical-id",
-      "d-aggregate",
-    ] as const) {
+  it("never dims cross-ref kinds in cluster mode when nothing is focused (default info-density preserved)", () => {
+    // Cluster mode default state (no node hovered or selected): every
+    // cross-ref edge stays full opacity so the dense info-rich palette the
+    // user explicitly praised is preserved at idle.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      // Both legacy 3-arg shape (anythingFocused defaults to false) and
+      // explicit-false 4-arg shape must return full opacity.
       expect(crossRefOpacityFor(k, false, false)).toBe(CROSSREF_FULL_OPACITY);
       expect(crossRefOpacityFor(k, false, true)).toBe(CROSSREF_FULL_OPACITY);
+      expect(crossRefOpacityFor(k, false, false, false)).toBe(CROSSREF_FULL_OPACITY);
+      expect(crossRefOpacityFor(k, false, true, false)).toBe(CROSSREF_FULL_OPACITY);
     }
+  });
+
+  it("never dims hierarchy in cluster mode regardless of focus", () => {
+    // d-aggregate stays full opacity even when something else is focused —
+    // it's structural backbone, not semantic info.
+    expect(crossRefOpacityFor("d-aggregate", false, false, true)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
+    expect(crossRefOpacityFor("d-aggregate", false, true, true)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
   });
 
   it("dim opacity is around 15% — visible enough to hint at structure, faint enough to recede", () => {
@@ -254,6 +266,49 @@ describe("crossRefOpacityFor (focus + context dimming)", () => {
     // single deliberate test edit, not a silent UX shift.
     expect(CROSSREF_DIM_OPACITY).toBe(0.15);
     expect(CROSSREF_FULL_OPACITY).toBe(1);
+  });
+});
+
+describe("crossRefOpacityFor — cluster-mode soft dim (Bug #2)", () => {
+  // INVARIANT LOCK: cluster mode dims unrelated cross-ref edges to ~35%
+  // ONLY when something is focused (hover or selection). Default state with
+  // nothing focused stays full opacity per the user's "cluster info-density
+  // is fine" verdict. The dim is softer than flat-mode (0.35 vs 0.15) to
+  // preserve the per-kind color cues + aggregated `xN` chips at-a-glance.
+
+  it("dims unrelated cross-refs to soft dim when something else is focused", () => {
+    // anythingFocused=true, isFocused=false (this edge does NOT touch the
+    // focused node) → soft dim.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(crossRefOpacityFor(k, false, false, true)).toBe(
+        CROSSREF_CLUSTER_SOFT_DIM_OPACITY,
+      );
+    }
+  });
+
+  it("keeps focused cross-refs full opacity in cluster mode", () => {
+    // anythingFocused=true, isFocused=true (this edge DOES touch the
+    // focused node) → stays full opacity so the focused subgraph pops out.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(crossRefOpacityFor(k, false, true, true)).toBe(CROSSREF_FULL_OPACITY);
+    }
+  });
+
+  it("soft dim opacity is around 35% — preserves per-kind color cues vs flat-mode hard dim", () => {
+    // Lock the literal so a future "make it more / less aggressive" tweak
+    // is a single deliberate test edit. Chose 0.35 (vs flat-mode 0.15)
+    // because cluster mode keeps the full per-kind palette + aggregated
+    // chips and we don't want them washing out completely on focus.
+    expect(CROSSREF_CLUSTER_SOFT_DIM_OPACITY).toBe(0.35);
+  });
+
+  it("hierarchy never participates in soft dim (stays full opacity always)", () => {
+    expect(crossRefOpacityFor("d-aggregate", false, false, true)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
+    expect(crossRefOpacityFor("d-aggregate", false, true, true)).toBe(
+      CROSSREF_FULL_OPACITY,
+    );
   });
 });
 
