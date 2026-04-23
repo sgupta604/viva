@@ -28,6 +28,7 @@ const KIND_BADGE: Record<string, string> = {
 function FileNodeInner({ data, selected }: Props) {
   const f = data.file;
   const selectedParamKey = useSelectionStore((s) => s.selectedParamKey);
+  const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
   const graph = useGraphStore((s) => s.graph);
 
   let highlight: "strong" | "muted" | null = null;
@@ -37,14 +38,37 @@ function FileNodeInner({ data, selected }: Props) {
     else if (h.nameMatch.has(f.id)) highlight = "muted";
   }
 
+  // Hover affordance — parity with TreeFileNode (`18d17f3`). Cluster-mode
+  // FileNode previously had no visible feedback when hovered (edges lit up
+  // but the node itself gave no signal that the hover was registering),
+  // which was inconsistent with dendrogram/tree mode. Same `ring-1
+  // ring-sky-300/60` token so the affordance reads identically across
+  // modes. Param-highlight rings still win because they convey strictly
+  // more state than either selection or hover.
+  const isHovered = hoveredNodeId === f.id;
+
+  // Dual-focus arbitration (user QA 2026-04-22, Bug #3): when the user has
+  // selected a file (blue ring + lit edges) AND moved their mouse to a
+  // different node (sky ring + that node's edges lit), edges already
+  // arbitrate to hover (`focusedNodeId = hoveredNodeId ?? selectedFileId`
+  // in GraphCanvas). Suppress the stale selection ring in the same case so
+  // both visual channels — node ring AND lit edges — agree on a single
+  // active focus instead of leaving the eye to ping between two rings.
+  // Selection ring stays on the selected node when nothing else is
+  // hovered (the natural "I clicked this; show me its world" state).
+  const isHoverDisplaceSelection =
+    selected && hoveredNodeId !== null && hoveredNodeId !== f.id;
+
   const ring =
     highlight === "strong"
       ? "ring-2 ring-amber-400"
       : highlight === "muted"
         ? "ring-1 ring-amber-400/40"
-        : selected
+        : selected && !isHoverDisplaceSelection
           ? "ring-2 ring-blue-400"
-          : "";
+          : isHovered
+            ? "ring-1 ring-sky-300/60"
+            : "";
 
   // Pin the rendered width to the dagre layout constant so the DOM node
   // never exceeds its reserved slot. `truncate` on the inner <div>s clips

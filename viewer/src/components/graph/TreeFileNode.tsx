@@ -50,18 +50,28 @@ function TreeFileNodeInner({ data, selected }: Props) {
   // Hover affordance (Change 4, user feedback 2026-04-22): when the user
   // hovers this card, brighten its border slightly so they get a clear
   // visual confirmation that "this hover IS what's lighting up the cross-
-  // ref edges." Sky-300 (TREE_CROSSREF_COLOR) at 60% so it reads as a soft
-  // accent — not loud enough to compete with the selected-blue ring or the
-  // amber param-highlight. Selection / param-highlight rings still win
-  // because they convey strictly more state than hover.
+  // ref edges." Sky-300 at 60% so it reads as a soft accent — not loud
+  // enough to compete with the selected-blue ring or the amber param-
+  // highlight.
   const isHovered = hoveredNodeId === f.id;
+
+  // Dual-focus arbitration (user QA 2026-04-22, Bug #3): when the user has
+  // selected a file AND moved their mouse to a different node, edges
+  // already arbitrate to hover (`focusedNodeId = hoveredNodeId ??
+  // selectedFileId` in GraphCanvas). Suppress the stale selection ring in
+  // the same case so both visual channels — node ring AND lit edges — agree
+  // on a single active focus instead of leaving the eye to ping between
+  // two rings. Selection ring stays on the selected node when nothing else
+  // is hovered (the natural "I clicked this; show me its world" state).
+  const isHoverDisplaceSelection =
+    selected && hoveredNodeId !== null && hoveredNodeId !== f.id;
 
   const ring =
     highlight === "strong"
       ? "ring-2 ring-amber-400"
       : highlight === "muted"
         ? "ring-1 ring-amber-400/40"
-        : selected
+        : selected && !isHoverDisplaceSelection
           ? "ring-2 ring-blue-400"
           : isHovered
             ? "ring-1 ring-sky-300/60"

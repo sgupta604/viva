@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import { ReactFlowProvider } from "reactflow";
 import FileNode from "./FileNode";
 import { NODE_W } from "@/lib/graph/layout";
 import type { FileNode as FileNodeData } from "@/lib/graph/types";
+import { useSelectionStore } from "@/lib/state/selection-store";
 
 // FileNode renders react-flow <Handle>s, which need a ReactFlowProvider
 // ancestor. Wrap every render call with it.
@@ -90,5 +91,55 @@ describe("FileNode", () => {
     const el = getByTestId("node-f1") as HTMLElement;
     expect(el.getAttribute("data-generated")).toBeNull();
     expect(queryByLabelText("generated from template")).toBeNull();
+  });
+
+  describe("hover affordance (parity with TreeFileNode)", () => {
+    beforeEach(() => {
+      useSelectionStore.setState({
+        selectedFileId: null,
+        selectedParamKey: null,
+        hoveredNodeId: null,
+      });
+    });
+
+    it("shows a sky-300 ring when this node is hovered (cluster-mode parity)", () => {
+      const file = makeFile();
+      // Pre-set the hovered id so the first render reads it.
+      useSelectionStore.setState({ hoveredNodeId: file.id });
+      const { getByTestId } = renderNode(file);
+      const el = getByTestId("node-f1") as HTMLElement;
+      // Must include the same hover-ring token TreeFileNode uses so the
+      // affordance reads identically across modes.
+      expect(el.className).toMatch(/ring-1\s+ring-sky-300\/60/);
+    });
+
+    it("does NOT show a hover ring when a different node is hovered", () => {
+      const file = makeFile();
+      useSelectionStore.setState({ hoveredNodeId: "some-other-node" });
+      const { getByTestId } = renderNode(file);
+      const el = getByTestId("node-f1") as HTMLElement;
+      expect(el.className).not.toMatch(/ring-sky-300/);
+    });
+
+    it("selection ring still wins over hover (selected + hovered = blue ring)", () => {
+      const file = makeFile();
+      useSelectionStore.setState({ hoveredNodeId: file.id });
+      const { getByTestId } = renderNode(file, true);
+      const el = getByTestId("node-f1") as HTMLElement;
+      expect(el.className).toMatch(/ring-2\s+ring-blue-400/);
+      expect(el.className).not.toMatch(/ring-sky-300/);
+    });
+
+    it("suppresses selection ring when a DIFFERENT node is hovered (dual-focus arbitration)", () => {
+      // Bug #3 fix: when this file is selected AND the user moves their
+      // mouse to a different node, edges already arbitrate to hover. Hide
+      // the stale selection ring so the rings and lit edges agree on a
+      // single active focus instead of leaving two rings competing.
+      const file = makeFile();
+      useSelectionStore.setState({ hoveredNodeId: "different-node" });
+      const { getByTestId } = renderNode(file, true);
+      const el = getByTestId("node-f1") as HTMLElement;
+      expect(el.className).not.toMatch(/ring-2\s+ring-blue-400/);
+    });
   });
 });
