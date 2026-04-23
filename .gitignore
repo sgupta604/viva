@@ -3,6 +3,9 @@ viewer/node_modules/
 viewer/dist/
 viewer/test-results/
 viewer/playwright-report/
+test-results/
+playwright-report/
+.playwright-mcp/
 viewer/public/graph.json
 viewer/public/graph-large.json
 viewer/public/graph-xlarge.json
@@ -47,3 +50,11 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Repo-root images (user screenshots + stray agent eyeball captures).
+# Don't recurse — viewer/test-results/ is already gitignored, source images intentionally tracked.
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.webp
