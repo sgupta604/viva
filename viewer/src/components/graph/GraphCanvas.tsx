@@ -214,7 +214,7 @@ export function GraphCanvas() {
           // Nested cluster nodes MUST declare parentNode, or React Flow
           // interprets their cluster-layout-emitted positions (which are
           // parent-relative) as absolute and every descendant overlaps its
-          // uncle clusters (BLOCKER 1 from post-finalize visual-verify).
+          // uncle clusters (BLOCKER 1 from the post-finalize visual review).
           parentNode: n.parent ?? undefined,
           extent: n.parent ? ("parent" as const) : undefined,
           position: { x: n.x, y: n.y },

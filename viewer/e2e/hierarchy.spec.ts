@@ -152,7 +152,7 @@ test.describe("Edges render as SVG paths (Bug 3)", () => {
 
 /**
  * Post-finalize blocker fixes — catches the exact two regressions surfaced by
- * visual-verify.md:
+ * the post-finalize visual review:
  *
  *   BLOCKER 1: expanded grandchild cluster bounding box collides with an
  *              uncle cluster's bounding box (pixel overlap in the UI).

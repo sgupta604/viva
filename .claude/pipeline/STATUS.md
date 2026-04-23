@@ -1,10 +1,12 @@
 # Pipeline Status
 
-**Updated:** 2026-04-22 (tree-layout-redesign finalized)
+**Updated:** 2026-04-23 (polish-batch-1 research complete; item 2 split out)
 
 ## Active
 
-_(idle — no active feature)_
+| Feature | Phase | Branch | Next |
+|---------|-------|--------|------|
+| polish-batch-1 | plan-complete | feat/polish-batch-1 | `/implement` — 3 streams (cleanup → crawler flag → viewer badge), commit order 4→3→1, ~4h estimate |
 
 ## Reminders
 
@@ -12,14 +14,14 @@ _(idle — no active feature)_
 - Plan Mode design locked in `.claude/docs/DECISIONS.md`, ready for `/research plan-mode` when appetite.
 - Product-strategy conversation: extending viva beyond config formats (Tier 1/2/3).
 - **v2.1 queue for large-codebase-viewer** (flagged during overnight session, captured in session-log.md):
-  - Heuristic / fuzzy ref matching (filename-glob inference)
+  - Heuristic / fuzzy ref matching (filename-glob inference) — soft Plan Mode coupling, defer until after
   - XPointer fragment resolution on xi:include hrefs
   - Jinja2 templating introspection (beyond current generated/authored flag)
-  - elkjs-as-primary layout promotion (currently sync grid-pack carries; elkjs skeleton only)
-  - Logical-ID whitelist CLI flag
-  - Collapsed-cluster internal-activity badge (intra-cluster edges silently drop today)
-  - Rendering shell/binary files as leaf nodes
-  - Promoting `viewer/scripts/visual-verify*.mjs` to CI pre-merge gate, or discarding
+  - ~~elkjs-as-primary layout promotion~~ — **shipped in tree-layout-redesign** (struck 2026-04-23 per polish-batch-1 research)
+  - ~~Logical-ID whitelist CLI flag~~ — **in polish-batch-1**
+  - ~~Collapsed-cluster internal-activity badge~~ — **in polish-batch-1**
+
+- **shell-binary-leaves** (deferred feature, reclassified 2026-04-23 from v2.1 polish queue during `polish-batch-1` research). **Goal:** emit `.sh` / `.py` / `.Dockerfile` / etc. as leaf nodes in `graph.json` so engineers viewing real codebases can answer "where are my scripts?". Currently the crawler is **deliberately config-only** — `docs/GRAPH-SCHEMA.md:308-310` documents it as an explicit non-goal. **Why it's not polish:** rewriting that non-goal is a schema decision; widening `FileKind` from 4-enum to 5-enum (`+"other"`) ripples through ~18 viewer call-sites (color/icon/filter logic) plus the zod schema. **Recommended approach when picked up:** gate behind `--include-leaves` opt-in CLI flag so default emission stays byte-identical (preserves the re-crawl invariant). Touches viewer surface → CLAUDE.md §Visual Review gate applies. Earned its own `/research` → `/plan` cycle. Research notes (the parts that were drafted while still bundled into polish-batch-1) live in `.claude/features/polish-batch-1/research.md` under "Item 2" — copy/extract when starting the dedicated feature.
 
 ## Queue
 
@@ -45,7 +47,7 @@ _(empty — up to user to decide what's next after merge)_
 ## Overnight session summary (context)
 
 - Started: PR #1 at 23 commits, automated tests all green, but visual review found 5 apparent UX bugs.
-- Ran 3 fix cycles: diagnose → fix-1 → visual-verify-1 (BLOCKED on 2 new issues) → fix-2 → scale-verify-at-3k (SHIP-AT-SCALE) → polish.
+- Ran 3 fix cycles: diagnose → fix-1 → visual-review-1 (BLOCKED on 2 new issues) → fix-2 → scale-verify-at-3k (SHIP-AT-SCALE) → polish.
 - Net commits added overnight: 5 (MCP registration + 3 fix/polish + handoff docs).
 - Final: 112 pytest + 109 Vitest + 42 Playwright green; FPS p95 = 18.00ms on 3k-node fixture (gate 33ms).
 - User's explicit acceptance criteria (no overlap / pretty / scalable to "ginormous codebase") all verified programmatically + screenshot evidence.

@@ -4,7 +4,7 @@ This is the lightweight, human-facing version of the per-feature checklist. The 
 
 **When to use this:** every time a viewer feature touches `viewer/src/components/graph/**` or `viewer/src/components/views/**`. After `/test` PASS, before approving `/finalize`. See `.claude/pipeline/WORKFLOW.md` §5.0 for the gate definition.
 
-**Why this exists:** programmatic visual checks (`viewer/scripts/visual-verify*.mjs`, FPS percentiles, bounding-box overlap) cannot detect labels on borders, edges under fills, or unexplained color palettes. A human eyeball is the only reliable detector for that regression class. Reference: `.claude/features/tree-layout-redesign/2026-04-22T00-00-00_research.md` §"Visual-review process recommendation".
+**Why this exists:** programmatic visual checks (FPS percentiles, bounding-box overlap, layout invariants) cannot detect labels on borders, edges under fills, or unexplained color palettes. A human eyeball is the only reliable detector for that regression class. Reference: `.claude/features/tree-layout-redesign/2026-04-22T00-00-00_research.md` §"Visual-review process recommendation".
 
 ## How to do a review
 
