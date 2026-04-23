@@ -1,12 +1,10 @@
 # Pipeline Status
 
-**Updated:** 2026-04-23 (polish-batch-1 research complete; item 2 split out)
+**Updated:** 2026-04-23 (polish-batch-1 finalized)
 
 ## Active
 
-| Feature | Phase | Branch | Next |
-|---------|-------|--------|------|
-| polish-batch-1 | plan-complete | feat/polish-batch-1 | `/implement` — 3 streams (cleanup → crawler flag → viewer badge), commit order 4→3→1, ~4h estimate |
+_(idle — no feature in flight)_
 
 ## Reminders
 
@@ -31,6 +29,7 @@ _(empty — up to user to decide what's next after merge)_
 
 | Feature | Date | PR / Merge |
 |---------|------|----|
+| polish-batch-1 | 2026-04-23 | [PR #2](https://github.com/sgupta604/viva/compare/feat/large-codebase-viewer...feat/polish-batch-1) ready to open — 5 commits; 257 Vitest + 120 pytest + 94 Playwright green; base feat/large-codebase-viewer (stacked on PR #1) |
 | tree-layout-redesign | 2026-04-22 | [PR #1](https://github.com/sgupta604/viva/pull/1) open (39 commits), **ready to merge** — dendrogram default, 3-pill toggle, focus-revealed palette, scale-tested to 10k |
 | large-codebase-viewer | 2026-04-22 | [PR #1](https://github.com/sgupta604/viva/pull/1) — subsumed by tree-layout-redesign on the same branch |
 | xml-viewer-hardening | 2026-04-21 | merged to main (fast-forward, 14 commits, tip `d1ed38b`) |
