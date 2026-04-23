@@ -93,6 +93,20 @@ const HIERARCHY_KINDS: ReadonlySet<EdgeKind> = new Set<EdgeKind>([
 ]);
 
 /**
+ * Indexed lookup over `EDGE_KIND_META` so per-kind helpers (`edgeStyleFor`,
+ * `focusedCrossRefStrokeFor`) can resolve a kind → meta in O(1) instead of
+ * scanning the array. Declared up here so any helper below can reference it
+ * without a temporal dead-zone surprise.
+ */
+const META_BY_KIND: Record<EdgeKind, EdgeKindMeta> = EDGE_KIND_META.reduce(
+  (acc, m) => {
+    acc[m.kind] = m;
+    return acc;
+  },
+  {} as Record<EdgeKind, EdgeKindMeta>,
+);
+
+/**
  * Bucket an edge kind into the tree-mode two-color scheme.
  * Pure helper — exported for tests and the legend chip.
  */
@@ -224,6 +238,87 @@ export function crossRefInteractionWidthFor(
 }
 
 /**
+ * Focus-revealed per-kind palette for cross-reference edges in flat
+ * (dendrogram/tree) modes. User feedback 2026-04-22 (Option D from research):
+ * the default amber-everywhere palette stays calm, but when a node is
+ * focused the LIT cross-ref edges switch from amber to their per-kind color
+ * from `EDGE_KIND_META` so the user can see WHICH kind each connection is.
+ *
+ * Default state (no focus): cross-ref edges render amber (`TREE_CROSSREF_COLOR`)
+ * — the calm dim-amber lattice the user praised.
+ *
+ * Focused state (hover OR selection on either endpoint): cross-ref edges
+ * touching the focused node render at their per-kind color from
+ * `EDGE_KIND_META` (include blue / import green / xsd green-dashed etc.).
+ *
+ * Cluster mode is unchanged — it already paints every cross-ref with its
+ * per-kind color all the time. The helper short-circuits to
+ * `EDGE_KIND_META[kind].color` so callers can use it uniformly.
+ *
+ * Hierarchy (`d-aggregate`) edges always return `TREE_HIERARCHY_COLOR` in
+ * flat mode (the slate backbone) and the hierarchy meta color in cluster
+ * mode — they're never re-themed by focus because they're structural, not
+ * semantic.
+ *
+ * Mirrors the `(kind, isFlatMode, isFocused)` shape of `crossRefOpacityFor`
+ * + `crossRefInteractionWidthFor` so the three helpers stay in lockstep.
+ */
+export function focusedCrossRefStrokeFor(
+  kind: EdgeKind,
+  isFlatMode: boolean,
+  isFocused: boolean,
+): string {
+  // Cluster mode: always per-kind color (existing behavior).
+  if (!isFlatMode) {
+    return META_BY_KIND[kind]?.color ?? TREE_CROSSREF_COLOR;
+  }
+  // Flat mode hierarchy: always the slate backbone color.
+  if (kind === "d-aggregate") return TREE_HIERARCHY_COLOR;
+  // Flat-mode cross-ref: per-kind color when focused, amber otherwise.
+  if (isFocused) {
+    return META_BY_KIND[kind]?.color ?? TREE_CROSSREF_COLOR;
+  }
+  return TREE_CROSSREF_COLOR;
+}
+
+/**
+ * Hierarchy backbone dim-on-focus (Bug #4 fix, 2026-04-22). User feedback:
+ * when a node is hovered or selected in flat mode, the lit cross-refs need
+ * to own the foreground. The full-opacity slate hierarchy backbone competes
+ * for attention even though it's already a low-contrast color; dropping it
+ * to ~40% opacity keeps the tree spine visible as context but lets the
+ * focused per-kind cross-refs pop.
+ *
+ * Default state (no focus): hierarchy renders at full opacity — the
+ * backbone is the primary structure cue and must read clearly.
+ *
+ * Focused state (any node hovered or selected in flat mode): hierarchy
+ * dims to 0.4 — visible enough to ground the focused subgraph in the tree's
+ * structure, faint enough to recede behind the lit cross-refs.
+ *
+ * Cluster mode: hierarchy is expressed via containment, not edges, so the
+ * helper short-circuits to full opacity — cluster-mode `d-aggregate` edges
+ * (when present) keep their normal weight.
+ *
+ * Mirrors the `(isFlatMode, isFocused)` shape of the cross-ref helpers
+ * for the lockstep guard. Note this helper takes only the two flag args
+ * since hierarchy dimming is per-mode, not per-kind — it's only ever
+ * applied to `d-aggregate` edges by the caller.
+ */
+export const HIERARCHY_DIM_OPACITY = 0.4;
+export const HIERARCHY_FULL_OPACITY = 1;
+
+export function hierarchyOpacityFor(
+  isFlatMode: boolean,
+  isFocused: boolean,
+): number {
+  // Cluster mode never dims hierarchy — and cluster mode rarely renders
+  // d-aggregate edges anyway since containment carries the relationship.
+  if (!isFlatMode) return HIERARCHY_FULL_OPACITY;
+  return isFocused ? HIERARCHY_DIM_OPACITY : HIERARCHY_FULL_OPACITY;
+}
+
+/**
  * 2-row legend metadata for tree mode. Keeps the same `EdgeKindMeta` shape
  * the legend already iterates over (label + color + strokeWidth), so the
  * EdgeLegend component can switch arrays without restructuring its JSX.
@@ -254,14 +349,6 @@ export const TREE_LEGEND_ROWS: readonly TreeLegendRow[] = [
     label: "reference",
   },
 ] as const;
-
-const META_BY_KIND: Record<EdgeKind, EdgeKindMeta> = EDGE_KIND_META.reduce(
-  (acc, m) => {
-    acc[m.kind] = m;
-    return acc;
-  },
-  {} as Record<EdgeKind, EdgeKindMeta>,
-);
 
 /**
  * Per-kind edge styling. v1 kinds (include/ref/import) unchanged; v2 adds:

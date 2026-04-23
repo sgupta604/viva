@@ -14,6 +14,10 @@ import {
   crossRefInteractionWidthFor,
   CROSSREF_INTERACTION_WIDTH_DIMMED,
   CROSSREF_INTERACTION_WIDTH_FOCUSED,
+  focusedCrossRefStrokeFor,
+  hierarchyOpacityFor,
+  HIERARCHY_DIM_OPACITY,
+  HIERARCHY_FULL_OPACITY,
 } from "./EdgeStyles";
 import type { EdgeKind } from "@/lib/graph/types";
 
@@ -337,6 +341,188 @@ describe("crossRefInteractionWidthFor (hit-target tracks visible opacity)", () =
           } else {
             expect(width).toBe(CROSSREF_INTERACTION_WIDTH_FOCUSED);
           }
+        }
+      }
+    }
+  });
+});
+
+describe("focusedCrossRefStrokeFor (focus-revealed per-kind palette)", () => {
+  // INVARIANT: in flat (dendrogram/tree) modes, cross-ref edges paint amber
+  // by default and switch to their per-kind EDGE_KIND_META color only when
+  // an endpoint is focused. Cluster mode always uses per-kind colors. The
+  // hierarchy backbone (`d-aggregate`) is never re-themed by focus — it
+  // stays slate in flat mode and gray in cluster mode.
+
+  it("paints flat-mode unfocused cross-refs amber (calm default)", () => {
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(focusedCrossRefStrokeFor(k, true, false)).toBe(TREE_CROSSREF_COLOR);
+    }
+  });
+
+  it("paints flat-mode focused cross-refs with their EDGE_KIND_META color", () => {
+    // include → blue, import → green, xsd → green, logical-id → orange-amber.
+    // Note: `ref` and `logical-id` happen to share TREE_CROSSREF_COLOR/its
+    // neighbor — covered explicitly so the lookup is verified, not lucky.
+    expect(focusedCrossRefStrokeFor("include", true, true)).toBe("#60a5fa");
+    expect(focusedCrossRefStrokeFor("ref", true, true)).toBe("#fbbf24");
+    expect(focusedCrossRefStrokeFor("import", true, true)).toBe("#34d399");
+    expect(focusedCrossRefStrokeFor("xsd", true, true)).toBe("#4ade80");
+    expect(focusedCrossRefStrokeFor("logical-id", true, true)).toBe("#f59e0b");
+  });
+
+  it("paints flat-mode hierarchy (d-aggregate) slate regardless of focus", () => {
+    expect(focusedCrossRefStrokeFor("d-aggregate", true, false)).toBe(
+      TREE_HIERARCHY_COLOR,
+    );
+    expect(focusedCrossRefStrokeFor("d-aggregate", true, true)).toBe(
+      TREE_HIERARCHY_COLOR,
+    );
+  });
+
+  it("uses EDGE_KIND_META per-kind colors in cluster mode regardless of focus", () => {
+    // Cluster mode is unchanged — every cross-ref always paints with its
+    // EDGE_KIND_META color, focused or not.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      const expected = EDGE_KIND_META.find((m) => m.kind === k)!.color;
+      expect(focusedCrossRefStrokeFor(k, false, false)).toBe(expected);
+      expect(focusedCrossRefStrokeFor(k, false, true)).toBe(expected);
+    }
+  });
+
+  it("paints cluster-mode d-aggregate with its EDGE_KIND_META gray", () => {
+    const aggMeta = EDGE_KIND_META.find((m) => m.kind === "d-aggregate")!;
+    expect(focusedCrossRefStrokeFor("d-aggregate", false, false)).toBe(aggMeta.color);
+    expect(focusedCrossRefStrokeFor("d-aggregate", false, true)).toBe(aggMeta.color);
+  });
+
+  it("flat-mode focused cross-ref color matches edgeStyleFor (cluster-mode parity)", () => {
+    // Lockstep with the cluster-mode palette: when a flat-mode cross-ref is
+    // focused, the color it picks MUST match what cluster mode would paint
+    // for the same kind. This is what makes "focused dendrogram" feel like
+    // a peek at the cluster palette without committing to a 6-color default.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      expect(focusedCrossRefStrokeFor(k, true, true)).toBe(
+        edgeStyleFor(k, false).stroke,
+      );
+    }
+  });
+});
+
+describe("hierarchyOpacityFor (Bug #4 — backbone dim on focus)", () => {
+  // INVARIANT: when a node is focused in a flat layout, the slate hierarchy
+  // backbone dims to 0.4 so the lit per-kind cross-refs own the foreground.
+  // Cluster mode never dims (containment carries the relationship).
+
+  it("dims hierarchy in flat mode when a node is focused", () => {
+    expect(hierarchyOpacityFor(true, true)).toBe(HIERARCHY_DIM_OPACITY);
+  });
+
+  it("renders hierarchy at full opacity in flat mode when nothing is focused", () => {
+    expect(hierarchyOpacityFor(true, false)).toBe(HIERARCHY_FULL_OPACITY);
+  });
+
+  it("never dims hierarchy in cluster mode (focused or not)", () => {
+    expect(hierarchyOpacityFor(false, true)).toBe(HIERARCHY_FULL_OPACITY);
+    expect(hierarchyOpacityFor(false, false)).toBe(HIERARCHY_FULL_OPACITY);
+  });
+
+  it("dim opacity is 0.4 — visible enough as backbone, faint enough to recede", () => {
+    // Lock the literal so a future "make it darker / brighter" tweak is a
+    // single deliberate test edit rather than a silent UX shift. If 0.4 is
+    // not dim enough during eyeball review, lower the constant here.
+    expect(HIERARCHY_DIM_OPACITY).toBe(0.4);
+    expect(HIERARCHY_FULL_OPACITY).toBe(1);
+  });
+});
+
+describe("focus-state lockstep across all four edge helpers", () => {
+  // INVARIANT LOCK: crossRefOpacityFor + crossRefInteractionWidthFor +
+  // focusedCrossRefStrokeFor + hierarchyOpacityFor MUST agree on which edges
+  // count as "focused" given identical inputs. If a future change relaxes
+  // the focus rules in one helper without the others, the visual + hit-zone
+  // + color + backbone-dim semantics drift and the focus interaction breaks.
+  //
+  // Definition of "focused-as-far-as-this-helper-cares":
+  //   - opacity: focused iff returns CROSSREF_FULL_OPACITY in flat mode for
+  //     a cross-ref kind. (Hierarchy + cluster mode always full.)
+  //   - hit-width: focused iff returns CROSSREF_INTERACTION_WIDTH_FOCUSED.
+  //   - stroke: focused iff returns the EDGE_KIND_META color (not the
+  //     amber default) for a flat-mode cross-ref kind.
+  //   - hierarchy-opacity: focused iff returns HIERARCHY_DIM_OPACITY in
+  //     flat mode (the backbone dims when something else is focused).
+
+  it("opacity and hit-width agree on every (kind, isFlat, isFocused) combo", () => {
+    for (const k of [
+      "include",
+      "ref",
+      "import",
+      "xsd",
+      "logical-id",
+      "d-aggregate",
+    ] as const) {
+      for (const isFlat of [true, false] as const) {
+        for (const isFocused of [true, false] as const) {
+          const opacity = crossRefOpacityFor(k, isFlat, isFocused);
+          const width = crossRefInteractionWidthFor(k, isFlat, isFocused);
+          const opacityIsFocused = opacity === CROSSREF_FULL_OPACITY;
+          const widthIsFocused = width === CROSSREF_INTERACTION_WIDTH_FOCUSED;
+          expect(opacityIsFocused).toBe(widthIsFocused);
+        }
+      }
+    }
+  });
+
+  it("stroke color flips iff opacity says cross-ref edge is dim-able + focused (flat mode only)", () => {
+    // Cross-ref edges in flat mode: when isFocused they get per-kind color;
+    // when not focused they get amber. The opacity helper tells us the same
+    // thing (full vs dim). The stroke helper MUST agree — if opacity says
+    // "this edge is in its lit/focused state" the stroke MUST be the
+    // per-kind color, not amber, for cross-ref kinds.
+    for (const k of ["include", "ref", "import", "xsd", "logical-id"] as const) {
+      for (const isFocused of [true, false] as const) {
+        const opacity = crossRefOpacityFor(k, true, isFocused);
+        const stroke = focusedCrossRefStrokeFor(k, true, isFocused);
+        const expectedStroke = isFocused
+          ? EDGE_KIND_META.find((m) => m.kind === k)!.color
+          : TREE_CROSSREF_COLOR;
+        expect(stroke).toBe(expectedStroke);
+        // Sanity: opacity full ↔ focused stroke; opacity dim ↔ amber stroke.
+        if (opacity === CROSSREF_FULL_OPACITY) {
+          expect(stroke).toBe(EDGE_KIND_META.find((m) => m.kind === k)!.color);
+        } else {
+          expect(stroke).toBe(TREE_CROSSREF_COLOR);
+        }
+      }
+    }
+  });
+
+  it("hierarchy backbone dims iff something is focused in flat mode (mirrors cross-ref focus rule)", () => {
+    // hierarchyOpacityFor doesn't take a kind — it's only ever called for
+    // d-aggregate. Its `isFocused` flag is the SAME flag the cross-ref
+    // helpers see (any node in the graph is hovered/selected). Verify the
+    // dim/full split agrees with the cross-ref helpers' notion of "the user
+    // is focusing on something."
+    for (const isFlat of [true, false] as const) {
+      for (const isFocused of [true, false] as const) {
+        const hOpacity = hierarchyOpacityFor(isFlat, isFocused);
+        // Pick a representative cross-ref kind to derive the focus state
+        // from the cross-ref helpers; any kind would do since they all
+        // agree (covered above).
+        const xrefOpacity = crossRefOpacityFor("include", isFlat, isFocused);
+        const xrefIsLit = xrefOpacity === CROSSREF_FULL_OPACITY;
+        if (isFlat && isFocused) {
+          // Cross-refs lit (touching focused node would be) AND backbone dimmed.
+          expect(xrefIsLit).toBe(true);
+          expect(hOpacity).toBe(HIERARCHY_DIM_OPACITY);
+        } else if (isFlat && !isFocused) {
+          // Default flat: cross-refs dim, backbone full.
+          expect(xrefIsLit).toBe(false);
+          expect(hOpacity).toBe(HIERARCHY_FULL_OPACITY);
+        } else {
+          // Cluster mode: nothing dims.
+          expect(xrefIsLit).toBe(true);
+          expect(hOpacity).toBe(HIERARCHY_FULL_OPACITY);
         }
       }
     }

@@ -28,6 +28,8 @@ import {
   treeEdgeStyleFor,
   crossRefOpacityFor,
   crossRefInteractionWidthFor,
+  focusedCrossRefStrokeFor,
+  hierarchyOpacityFor,
 } from "./EdgeStyles";
 import { EdgeLegend } from "./EdgeLegend";
 import FileNode from "./FileNode";
@@ -326,10 +328,24 @@ export function GraphCanvas() {
       // the mouse moves away — matches the natural "I clicked this; show me
       // its world" mental model.
       const focusedNodeId = hoveredNodeId ?? selectedFileId;
+      // "Edge focused" — this edge's source or target IS the focused node.
+      // Used by crossRefOpacityFor / crossRefInteractionWidthFor /
+      // focusedCrossRefStrokeFor to decide whether THIS edge lights up.
       const isFocused =
         focusedNodeId !== null &&
         (e.source === focusedNodeId || e.target === focusedNodeId);
-      const opacity = crossRefOpacityFor(e.kind, isFlatMode, isFocused);
+      // "Anything focused" — ANY node in the graph is focused (hovered or
+      // selected). Used by hierarchyOpacityFor to dim the backbone whenever
+      // the user is investigating something, regardless of whether THIS
+      // hierarchy edge touches it.
+      const anythingFocused = focusedNodeId !== null;
+      const isHierarchyKind = e.kind === "d-aggregate";
+      // Hierarchy edges use hierarchyOpacityFor (dim backbone on focus).
+      // Cross-ref edges use crossRefOpacityFor (dim by default, lit when
+      // touching the focused node).
+      const opacity = isHierarchyKind
+        ? hierarchyOpacityFor(isFlatMode, anythingFocused)
+        : crossRefOpacityFor(e.kind, isFlatMode, isFocused);
       // Hit-target width must shrink in lockstep with the visible opacity
       // (user QA 2026-04-22): React Flow's invisible 20px-wide
       // `react-flow__edge-interaction` overlay was eating pointer events for
@@ -343,6 +359,16 @@ export function GraphCanvas() {
         isFlatMode,
         isFocused,
       );
+      // Focus-revealed per-kind palette (Option D, 2026-04-22): in flat
+      // modes, cross-ref edges paint amber by default and switch to their
+      // EDGE_KIND_META color when their endpoint is focused. Cluster mode
+      // already paints per-kind via `edgeStyleFor` above, so the helper is
+      // a no-op there (it returns the same per-kind color either way).
+      // Unresolved edges keep their red `style.stroke` from treeEdgeStyleFor
+      // / edgeStyleFor — the helper override only applies when resolved.
+      const stroke = e.unresolved
+        ? style.stroke
+        : focusedCrossRefStrokeFor(e.kind, isFlatMode, isFocused);
       // Bezier curves for cross-ref edges in flat modes (Change 2): the
       // smoothstep orthogonal routing inherited from elkjs's mrtree was the
       // visual culprit behind images #13/#14 — straight horizontal/vertical
@@ -360,6 +386,7 @@ export function GraphCanvas() {
         interactionWidth,
         style: {
           ...style,
+          stroke,
           strokeWidth: isAggregated
             ? Math.min(6, 1.5 + Math.log2(e.count))
             : style.strokeWidth,
@@ -368,7 +395,10 @@ export function GraphCanvas() {
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: style.stroke,
+          // Arrowhead inherits the per-kind focused color in lockstep with
+          // the path stroke — so a focused include edge shows a blue arrow,
+          // not an amber one.
+          color: stroke,
         },
         // ariaLabel renders as a native browser tooltip on the SVG path
         // (React Flow forwards it onto the edge group). Gives tree-mode
