@@ -15,6 +15,7 @@ def crawl(
     use_default_excludes: bool = True,
     jobs: int = 1,
     logical_id_max_cardinality: int = 20,
+    logical_id_whitelist: set[str] | None = None,
 ) -> Graph:
     """Crawl `root` and return a Graph.
 
@@ -72,7 +73,9 @@ def crawl(
     # the ref-resolved edges below.
     clusters = build_clusters(files)
     edges = resolve_references(
-        files, logical_id_max_cardinality=logical_id_max_cardinality,
+        files,
+        logical_id_max_cardinality=logical_id_max_cardinality,
+        logical_id_whitelist=logical_id_whitelist,
     )
     edges.extend(build_d_aggregate_edges(files, clusters))
     return Graph(

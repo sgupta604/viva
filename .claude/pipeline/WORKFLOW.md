@@ -56,7 +56,7 @@ Runs: pytest (crawler) + Vitest (viewer) + Playwright (E2E) + lint + typecheck +
 2. Orchestrator surfaces that file path to the user. Does NOT auto-suggest `/finalize`.
 3. User opens each screenshot, walks the 10-item checklist, and either approves ("looks good") or rejects (loops back to `/diagnose` or `/quickfix`).
 
-**Why this exists:** programmatic visual checks (`visual-verify*.mjs`, FPS percentiles, bbox overlap) cannot detect labels-on-borders, edges-under-fills, or unexplained color palettes — exactly the regression class that motivated `tree-layout-redesign`. A human eyeball is the only reliable detector for that class. Reference: `.claude/templates/visual-review.md` and the human checklist at `viewer/scripts/visual-review-checklist.md`.
+**Why this exists:** programmatic visual checks (FPS percentiles, bbox overlap, layout invariants) cannot detect labels-on-borders, edges-under-fills, or unexplained color palettes — exactly the regression class that motivated `tree-layout-redesign`. A human eyeball is the only reliable detector for that class. Reference: `.claude/templates/visual-review.md` and the human checklist at `viewer/scripts/visual-review-checklist.md`.
 
 **Exit gate:** literal "looks good" (or explicit equivalent) from the user.
 

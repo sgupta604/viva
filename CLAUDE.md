@@ -69,7 +69,7 @@ For any feature whose `/test` PASS reports modified files matching `viewer/src/c
 After `/test` returns PASS on a viewer-surface feature:
 1. The test-agent populates `.claude/active-work/<feature>/visual-review.md` from the template at `.claude/templates/visual-review.md`, including paths to every screenshot it captured.
 2. Surface that file path to the user. Do not proceed.
-3. Wait for the user's literal "looks good" (or equivalent explicit approval — "ship it", "approved", etc.). Programmatic visual checks (`visual-verify*.mjs`, percentile FPS, bounding-box overlap) are NOT a substitute — the failure mode this gate exists to prevent is "an LLM scoring its own work declares success."
+3. Wait for the user's literal "looks good" (or equivalent explicit approval — "ship it", "approved", etc.). Programmatic visual checks (percentile FPS, bounding-box overlap, layout invariants) are NOT a substitute — the failure mode this gate exists to prevent is "an LLM scoring its own work declares success."
 4. Only after explicit human approval, suggest `/finalize`.
 
 Backend / CLI / crawler-only changes auto-skip this gate (consistent with the quickfix merge-flow split saved in user MEMORY).

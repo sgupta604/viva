@@ -72,8 +72,34 @@ def _build_parser() -> argparse.ArgumentParser:
             "high-cardinality ID from exploding the graph."
         ),
     )
+    p.add_argument(
+        "--logical-id-whitelist", default=None,
+        help=(
+            "Comma-separated list of logical-IDs to allow (e.g. "
+            "`--logical-id-whitelist FOO,BAR`). When supplied, ANY logical-ID "
+            "not in the list is silently dropped — combined with "
+            "--logical-id-max-cardinality via AND semantics (both filters "
+            "must pass). Default unset = no filtering, byte-identical to "
+            "prior behavior. Per-item whitespace is stripped; an empty "
+            "string is treated as unset."
+        ),
+    )
     p.add_argument("-v", "--verbose", action="count", default=0)
     return p
+
+
+def _parse_logical_id_whitelist(raw: str | None) -> set[str] | None:
+    """Comma-list → set; empty / None → None so default behavior is preserved.
+
+    Per-item whitespace is stripped; entries that are empty after strip are
+    discarded. If the resulting set is empty (e.g. raw was `""` or `","`),
+    returns None so downstream code treats it identically to an unset flag.
+    """
+    if raw is None:
+        return None
+    items = {tok.strip() for tok in raw.split(",")}
+    items.discard("")
+    return items or None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         use_default_excludes=not args.no_default_excludes,
         jobs=args.jobs,
         logical_id_max_cardinality=args.logical_id_max_cardinality,
+        logical_id_whitelist=_parse_logical_id_whitelist(args.logical_id_whitelist),
     )
     log.info(
         "crawled %s: %d files, %d edges (%d unresolved, %d parse errors)",

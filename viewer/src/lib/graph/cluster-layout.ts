@@ -73,6 +73,18 @@ export interface LaidOutGraphNode {
    * for parent clusters whose files live in nested sub-folders (BLOCKER 2).
    */
   totalDescendantFiles?: number;
+  /**
+   * Count of edges that retargeted to this folder on BOTH endpoints — i.e.
+   * the edge connects two files inside the same collapsed folder and would
+   * otherwise drop silently as a self-loop. The `↻ N` collapsed-folder badge
+   * surfaces this so users can tell at a glance whether activity is hidden.
+   * Populated for `cluster` nodes (cluster + tree modes, rendered by
+   * ClusterNode) and for `treeFolder` nodes (dendrogram mode, rendered by
+   * TreeFolderNode). Only meaningful when the folder is collapsed; when
+   * expanded the underlying edges are visible directly.
+   * Undefined / 0 → badge hidden (no `↻ 0` noise).
+   */
+  intraClusterEdgeCount?: number;
 }
 
 /**
@@ -194,10 +206,23 @@ export function computeClusterLayout(
   // Edge pass — retarget to clusters when endpoint isn't a visible node,
   // walking up to the NEAREST visible ancestor (not blindly the top cluster).
   const visibleIds = new Set(nodes.map((n) => n.id));
-  const edges = retargetEdges(graph.edges, {
+  const { edges, intraClusterEdgeCounts } = retargetEdges(graph.edges, {
     visibleIds,
     fileToClusterChain,
   });
+
+  // Merge intra-cluster edge counts onto the matching cluster nodes. We do
+  // this as a post-pass (rather than during layout) because the count is
+  // a property of the laid-out edge graph, not the cluster geometry — and
+  // computing it lives naturally inside `retargetEdges` where the self-loop
+  // drop already happens.
+  for (const node of nodes) {
+    if (node.kind !== "cluster") continue;
+    const count = intraClusterEdgeCounts.get(node.id);
+    if (count !== undefined && count > 0) {
+      node.intraClusterEdgeCount = count;
+    }
+  }
 
   return { nodes, edges };
 }
@@ -452,13 +477,15 @@ function retargetEndpoint(id: string, ctx: RetargetCtx): string | null {
  *  - Aggregate multiple  (source, target)  pairs into a single edge with a
  *    kind-breakdown tooltip (research Q9).
  *  - Drop self-loops (source === target after retarget) — collapsed clusters
- *    with purely-internal activity don't render an edge at this revision;
- *    an "internal activity" badge is a follow-up.
+ *    with purely-internal activity don't render an edge here; instead, the
+ *    drop is tallied per-cluster in `intraClusterEdgeCounts` so the
+ *    collapsed-cluster `↻ N` badge can surface the hidden activity
+ *    (polish-batch-1 item 1).
  */
 function retargetEdges(
   edges: Edge[],
   ctx: RetargetCtx,
-): LaidOutGraphEdge[] {
+): { edges: LaidOutGraphEdge[]; intraClusterEdgeCounts: Map<string, number> } {
   interface Bucket {
     source: string;
     target: string;
@@ -469,13 +496,20 @@ function retargetEdges(
   }
 
   const buckets = new Map<string, Bucket>();
+  const intraClusterEdgeCounts = new Map<string, number>();
 
   for (const e of edges) {
     if (e.target === null) continue; // unresolved — handled elsewhere
     const src = retargetEndpoint(e.source, ctx);
     const tgt = retargetEndpoint(e.target, ctx);
     if (!src || !tgt) continue;
-    if (src === tgt) continue; // self-loop after aggregation — drop
+    if (src === tgt) {
+      // Self-loop after retarget: both endpoints rolled up to the same visible
+      // cluster ancestor. The edge isn't drawable, but it's not noise either —
+      // record it so the collapsed-cluster badge can surface the hidden count.
+      intraClusterEdgeCounts.set(src, (intraClusterEdgeCounts.get(src) ?? 0) + 1);
+      continue;
+    }
 
     const key = `${src}->${tgt}`;
     let bucket = buckets.get(key);
@@ -494,7 +528,7 @@ function retargetEdges(
   }
 
   let i = 0;
-  return Array.from(buckets.values()).map((b) => {
+  const laidOutEdges = Array.from(buckets.values()).map((b) => {
     const total = Object.values(b.kinds).reduce((a, n) => a + n, 0);
     return {
       id: `${b.source}->${b.target}-${b.firstKind}-${i++}`,
@@ -507,4 +541,5 @@ function retargetEdges(
       attrs: b.firstAttrs,
     };
   });
+  return { edges: laidOutEdges, intraClusterEdgeCounts };
 }

@@ -517,3 +517,87 @@ describe("computeClusterLayout — totalDescendantFiles (BLOCKER 2)", () => {
     expect(leaf!.totalDescendantFiles).toBe(4);
   });
 });
+
+/**
+ * polish-batch-1 item 1 — collapsed-cluster intra-edge badge.
+ *
+ * Today, edges between two files inside the same collapsed cluster get
+ * silently dropped at the `src === tgt` branch in `retargetEdges` (after both
+ * endpoints retarget to the same cluster id). The badge surfaces that count
+ * so a user can tell at a glance whether collapsing a cluster hides activity.
+ */
+function makeIntraClusterEdgeFixture(): Graph {
+  const clusters = [
+    {
+      path: "alpha",
+      parent: null,
+      childFiles: ["a0", "a1", "a2"],
+      childClusters: [],
+      kind: "folder" as const,
+    },
+    {
+      path: "beta",
+      parent: null,
+      childFiles: ["b0", "b1"],
+      childClusters: [],
+      kind: "folder" as const,
+    },
+  ];
+  const mkFile = (id: string, folder: string) => ({
+    id,
+    path: `${folder}/${id}.xml`,
+    name: `${id}.xml`,
+    folder,
+    kind: "xml" as const,
+    sizeBytes: 100,
+    params: [],
+    parseError: null,
+    isTest: false,
+  });
+  const files = [
+    mkFile("a0", "alpha"),
+    mkFile("a1", "alpha"),
+    mkFile("a2", "alpha"),
+    mkFile("b0", "beta"),
+    mkFile("b1", "beta"),
+  ];
+  // alpha has 2 intra-cluster edges (a0→a1, a1→a2) and 1 cross-cluster (a0→b0).
+  // beta has 0 intra-cluster edges.
+  const edges = [
+    { source: "a0", target: "a1", kind: "include" as const, unresolved: null },
+    { source: "a1", target: "a2", kind: "ref" as const, unresolved: null },
+    { source: "a0", target: "b0", kind: "include" as const, unresolved: null },
+  ];
+  return { version: 2, root: "intra", files, edges, clusters };
+}
+
+describe("computeClusterLayout — intraClusterEdgeCount (polish-batch-1 item 1)", () => {
+  it("counts edges that drop as self-loops on a collapsed cluster", () => {
+    const laid = computeClusterLayout(makeIntraClusterEdgeFixture(), new Set());
+    const alpha = laid.nodes.find((n) => n.id === "alpha");
+    expect(alpha).toBeDefined();
+    // a0→a1 + a1→a2 = 2 intra-cluster drops. a0→b0 stays a real edge.
+    expect(alpha!.intraClusterEdgeCount).toBe(2);
+  });
+
+  it("cluster with no intra-cluster edges has count 0 or undefined", () => {
+    const laid = computeClusterLayout(makeIntraClusterEdgeFixture(), new Set());
+    const beta = laid.nodes.find((n) => n.id === "beta");
+    expect(beta).toBeDefined();
+    // Either omitted or explicitly 0 — both are acceptable; ClusterNode hides
+    // the badge in either case.
+    expect(beta!.intraClusterEdgeCount ?? 0).toBe(0);
+  });
+
+  it("expanded cluster does not accumulate intra-cluster drops (edges become visible)", () => {
+    // When alpha is expanded, a0/a1/a2 are real visible nodes; the edges
+    // between them are real edges, not self-loops. Count should be 0.
+    const laid = computeClusterLayout(
+      makeIntraClusterEdgeFixture(),
+      new Set(["alpha"]),
+    );
+    const alpha = laid.nodes.find((n) => n.id === "alpha");
+    expect(alpha).toBeDefined();
+    expect(alpha!.intraClusterEdgeCount ?? 0).toBe(0);
+  });
+});

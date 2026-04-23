@@ -6,12 +6,24 @@
  * fit-view button. Top-right keeps it out of the way of both the controls
  * and the bottom-right read-only hint.
  *
- * Detail-panel avoidance (user QA 2026-04-22, Bug #7): the detail panel
- * opens as a 400px-wide fixed aside anchored bottom-right top:96px. At a
- * typical 1600-wide viewport it sits directly over the top-right legend.
- * When a file is selected (panel open), shift the legend left so it clears
- * the panel. 416px = 400px panel + 16px breathing margin, matching the
- * 12px chip inset from the canvas edge.
+ * Detail-panel avoidance (user QA 2026-04-22, Bug #7; refined 2026-04-23):
+ * the detail panel opens as a 400px-wide fixed aside anchored bottom-right
+ * top:96px. At a typical 1600-wide viewport it sits directly over the
+ * top-right legend. When the panel is OPEN, shift the legend left so it
+ * clears it. 416px = 400px panel + 16px breathing margin.
+ *
+ * The slide is keyed off `detailPanelOpen` — the actual panel-visible flag
+ * — NOT `selectedFileId`. Two earlier bugs the latter caused (visual-review
+ * 2026-04-23):
+ *   1. With auto-open-panel toggled OFF, clicking a file updated selection
+ *      WITHOUT opening the panel, but the legend still slid as if the panel
+ *      were there.
+ *   2. After the user manually closed the panel via its X button,
+ *      `selectedFileId` was still set so the legend stayed in the
+ *      slid-out position with no panel beside it.
+ * `detailPanelOpen` is the single source of truth FileDetailPanel itself
+ * reads (see FileDetailPanel.tsx:`if (!file || !detailPanelOpen) return null`),
+ * so keying off it makes the two surfaces lockstep by construction.
  *
  * Content (user feedback 2026-04-22, follow-up): every layout — dendrogram,
  * tree, clusters — renders the full 6-row legend driven by EDGE_KIND_META.
@@ -41,9 +53,9 @@ export function EdgeLegend() {
   const collapsed = useViewStore((s) => s.legendCollapsed);
   const setCollapsed = useViewStore((s) => s.setLegendCollapsed);
   const graphLayout = useViewStore((s) => s.graphLayout);
-  const selectedFileId = useSelectionStore((s) => s.selectedFileId);
+  const detailPanelOpen = useSelectionStore((s) => s.detailPanelOpen);
   const isFlatMode = graphLayout === "tree" || graphLayout === "dendrogram";
-  const panelOpen = selectedFileId !== null;
+  const panelOpen = detailPanelOpen;
 
   // Single row shape for every mode. The per-kind testIdSuffix mirrors the
   // EdgeKind values so existing `edge-legend-item-${kind}` selectors keep

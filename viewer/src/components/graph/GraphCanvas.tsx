@@ -214,7 +214,7 @@ export function GraphCanvas() {
           // Nested cluster nodes MUST declare parentNode, or React Flow
           // interprets their cluster-layout-emitted positions (which are
           // parent-relative) as absolute and every descendant overlaps its
-          // uncle clusters (BLOCKER 1 from post-finalize visual-verify).
+          // uncle clusters (BLOCKER 1 from the post-finalize visual review).
           parentNode: n.parent ?? undefined,
           extent: n.parent ? ("parent" as const) : undefined,
           position: { x: n.x, y: n.y },
@@ -233,6 +233,12 @@ export function GraphCanvas() {
             // Badge shows TOTAL descendant file count (BLOCKER 2), falling
             // back to direct childCount for graphs that predate the fix.
             childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
+            // polish-batch-1 item 1 — collapsed-cluster intra-edge count
+            // surfaced via the `↻ N` pill in ClusterNode. Cluster mode +
+            // tree mode both reach this branch (both emit `kind: "cluster"`
+            // and render via ClusterNode). Dendrogram mode wires the same
+            // count through the `treeFolder` branch below to TreeFolderNode.
+            intraClusterEdgeCount: n.intraClusterEdgeCount,
           },
           style: { width: n.width, height: n.height },
           selectable: false,
@@ -278,6 +284,12 @@ export function GraphCanvas() {
             // reads as 0 for parents whose files live in nested folders.
             childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
             descendantOfFocus,
+            // Collapsed-folder intra-edge count (visual-review 2026-04-23
+            // — extends polish-batch-1 item 1 from cluster mode to
+            // dendrogram mode). TreeFolderNode renders the same `↻ N`
+            // pill ClusterNode does whenever this is > 0; hidden when
+            // 0/undefined to keep the no-noise rule.
+            intraClusterEdgeCount: n.intraClusterEdgeCount,
           },
           style: { width: n.width, height: n.height },
           selectable: false,

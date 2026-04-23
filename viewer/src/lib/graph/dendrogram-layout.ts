@@ -83,7 +83,19 @@ function retargetEndpoint(id: string, ctx: RetargetCtx): string | null {
   return null;
 }
 
-function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
+/**
+ * Retarget cross-ref edges + tally per-folder self-loops.
+ *
+ * Returns the visible cross-ref edges PLUS a per-folder count of edges
+ * that self-loop at this folder (both endpoints rolled up to the same
+ * visible folder card). The count drives the `↻ N` collapsed-folder
+ * badge in TreeFolderNode — same affordance ClusterNode shows in cluster
+ * mode (visual-review 2026-04-23).
+ */
+function retargetEdges(
+  edges: Edge[],
+  ctx: RetargetCtx,
+): { edges: LaidOutGraphEdge[]; intraClusterEdgeCounts: Map<string, number> } {
   interface Bucket {
     source: string;
     target: string;
@@ -94,13 +106,17 @@ function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
   }
 
   const buckets = new Map<string, Bucket>();
+  const intraClusterEdgeCounts = new Map<string, number>();
 
   for (const e of edges) {
     if (e.target === null) continue;
     const src = retargetEndpoint(e.source, ctx);
     const tgt = retargetEndpoint(e.target, ctx);
     if (!src || !tgt) continue;
-    if (src === tgt) continue;
+    if (src === tgt) {
+      intraClusterEdgeCounts.set(src, (intraClusterEdgeCounts.get(src) ?? 0) + 1);
+      continue;
+    }
 
     const key = `${src}->${tgt}`;
     let bucket = buckets.get(key);
@@ -119,7 +135,7 @@ function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
   }
 
   let i = 0;
-  return Array.from(buckets.values()).map((b) => {
+  const laidOutEdges = Array.from(buckets.values()).map((b) => {
     const total = Object.values(b.kinds).reduce((a, n) => a + n, 0);
     return {
       id: `${b.source}->${b.target}-${b.firstKind}-${i++}`,
@@ -132,6 +148,7 @@ function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
       attrs: b.firstAttrs,
     };
   });
+  return { edges: laidOutEdges, intraClusterEdgeCounts };
 }
 
 function buildFileToClusterChain(
@@ -567,10 +584,27 @@ export async function computeDendrogramLayout(
   // `retargetEdges` walks each edge's endpoints up the cluster chain to the
   // nearest visible ancestor, so when a deep file is hidden inside a
   // collapsed folder the edge re-anchors to the folder card.
-  const crossRefEdges = retargetEdges(graph.edges, {
-    visibleIds,
-    fileToClusterChain,
-  });
+  const { edges: crossRefEdges, intraClusterEdgeCounts } = retargetEdges(
+    graph.edges,
+    {
+      visibleIds,
+      fileToClusterChain,
+    },
+  );
+
+  // Attach per-folder intra-edge counts so TreeFolderNode can render the
+  // collapsed-folder `↻ N` badge (visual-review 2026-04-23 — same
+  // affordance as ClusterNode in cluster mode). Only meaningful for
+  // collapsed `treeFolder` cards; expanded folders aren't rendered in
+  // dendrogram mode (the layout is flat) so an expanded card never owns
+  // a self-loop count.
+  for (const node of nodes) {
+    if (node.kind !== "treeFolder") continue;
+    const count = intraClusterEdgeCounts.get(node.id);
+    if (count !== undefined && count > 0) {
+      node.intraClusterEdgeCount = count;
+    }
+  }
 
   // Hierarchy first (paints below) → cross-refs second (paints above so
   // cyan stays visible against slate). React Flow renders in array order.

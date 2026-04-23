@@ -74,7 +74,20 @@ function retargetEndpoint(id: string, ctx: RetargetCtx): string | null {
   return null;
 }
 
-function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
+/**
+ * Retarget edges to visible endpoints + tally per-cluster self-loops.
+ *
+ * Mirrors `cluster-layout.ts:retargetEdges` so the `↻ N` collapsed-cluster
+ * badge surfaces hidden intra-folder activity in tree mode too — not just
+ * cluster mode (visual-review 2026-04-23, "icon doesn't appear in tree
+ * mode huh?"). When both endpoints retarget to the same visible cluster,
+ * the edge would otherwise drop silently as a self-loop; we record the
+ * drop per-cluster instead so the renderer can paint the count.
+ */
+function retargetEdges(
+  edges: Edge[],
+  ctx: RetargetCtx,
+): { edges: LaidOutGraphEdge[]; intraClusterEdgeCounts: Map<string, number> } {
   interface Bucket {
     source: string;
     target: string;
@@ -85,13 +98,20 @@ function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
   }
 
   const buckets = new Map<string, Bucket>();
+  const intraClusterEdgeCounts = new Map<string, number>();
 
   for (const e of edges) {
     if (e.target === null) continue;
     const src = retargetEndpoint(e.source, ctx);
     const tgt = retargetEndpoint(e.target, ctx);
     if (!src || !tgt) continue;
-    if (src === tgt) continue;
+    if (src === tgt) {
+      // Self-loop after retarget: both endpoints rolled up to the same
+      // visible cluster ancestor. Tally per-cluster so the collapsed-cluster
+      // `↻ N` badge can surface the hidden count.
+      intraClusterEdgeCounts.set(src, (intraClusterEdgeCounts.get(src) ?? 0) + 1);
+      continue;
+    }
 
     const key = `${src}->${tgt}`;
     let bucket = buckets.get(key);
@@ -110,7 +130,7 @@ function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
   }
 
   let i = 0;
-  return Array.from(buckets.values()).map((b) => {
+  const laidOutEdges = Array.from(buckets.values()).map((b) => {
     const total = Object.values(b.kinds).reduce((a, n) => a + n, 0);
     return {
       id: `${b.source}->${b.target}-${b.firstKind}-${i++}`,
@@ -123,6 +143,7 @@ function retargetEdges(edges: Edge[], ctx: RetargetCtx): LaidOutGraphEdge[] {
       attrs: b.firstAttrs,
     };
   });
+  return { edges: laidOutEdges, intraClusterEdgeCounts };
 }
 
 function buildFileToClusterChain(
@@ -539,10 +560,22 @@ export async function computeTreeLayout(
   }
 
   const visibleIds = new Set(nodes.map((n) => n.id));
-  const edges = retargetEdges(graph.edges, {
+  const { edges, intraClusterEdgeCounts } = retargetEdges(graph.edges, {
     visibleIds,
     fileToClusterChain,
   });
+
+  // Attach per-cluster intra-edge counts so the collapsed `↻ N` badge in
+  // ClusterNode (which tree mode renders for folders) lights up. Same
+  // pattern cluster-layout.ts uses; kept as a post-pass because the count
+  // is a property of the laid-out edge graph, not the cluster geometry.
+  for (const node of nodes) {
+    if (node.kind !== "cluster") continue;
+    const count = intraClusterEdgeCounts.get(node.id);
+    if (count !== undefined && count > 0) {
+      node.intraClusterEdgeCount = count;
+    }
+  }
 
   return { nodes, edges };
 }

@@ -15,7 +15,14 @@ test.describe("Large-scale 3k-file fixture", () => {
     await waitForGraphReady(page);
     await page.waitForTimeout(400);
 
-    const clusterNodes = page.locator('[data-testid^="cluster-"]');
+    // Match cluster CARDS only — exclude `cluster-intra-badge-…` pills that
+    // also use the `cluster-` testid prefix (introduced by the polish-batch-1
+    // collapsed-folder badge + visual-review 2026-04-23 follow-up). Without
+    // this guard the locator double-counts (card + badge) when any folder
+    // hides intra-folder cross-refs.
+    const clusterNodes = page.locator(
+      '[data-testid^="cluster-"]:not([data-testid^="cluster-intra-badge-"])',
+    );
     const clusterCount = await clusterNodes.count();
     // 20 top-level clusters exactly, nothing more (no file nodes)
     expect(clusterCount).toBe(20);

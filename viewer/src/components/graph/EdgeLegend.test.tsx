@@ -108,6 +108,7 @@ describe("EdgeLegend — positioning", () => {
       selectedFileId: null,
       selectedParamKey: null,
       hoveredNodeId: null,
+      detailPanelOpen: false,
     });
   });
 
@@ -123,16 +124,48 @@ describe("EdgeLegend — positioning", () => {
     expect(chip.getAttribute("data-panel-open")).toBe("false");
   });
 
-  it("shifts left to clear the 400px detail panel when a file is selected (Bug #7)", () => {
-    // Simulate a file selection — the FileDetailPanel renders bottom-right
-    // top:96px with width 400px and would otherwise cover the legend at
-    // typical viewport widths. The legend reads selection state and
-    // shifts to right=416 (panel + 16px breathing margin) so both stay
-    // visible without overlap.
-    useSelectionStore.setState({ selectedFileId: "some-file" });
+  it("shifts left to clear the 400px detail panel when the panel is open (Bug #7)", () => {
+    // Simulate the panel being OPEN — the FileDetailPanel renders
+    // bottom-right top:96px with width 400px and would otherwise cover
+    // the legend at typical viewport widths. The legend reads
+    // detailPanelOpen and shifts to right=416 (panel + 16px breathing
+    // margin) so both stay visible without overlap.
+    useSelectionStore.setState({
+      selectedFileId: "some-file",
+      detailPanelOpen: true,
+    });
     render(<EdgeLegend />);
     const chip = screen.getByTestId("edge-legend");
     expect((chip as HTMLElement).style.right).toBe("416px");
     expect(chip.getAttribute("data-panel-open")).toBe("true");
+  });
+
+  // Bug #1 (visual-review 2026-04-23): with auto-open-panel toggled OFF,
+  // a click sets selectedFileId but leaves detailPanelOpen=false — the
+  // legend MUST stay put because no panel is rendered to clear.
+  it("stays put when a file is selected but the panel is closed (auto-open OFF case)", () => {
+    useSelectionStore.setState({
+      selectedFileId: "some-file",
+      detailPanelOpen: false,
+    });
+    render(<EdgeLegend />);
+    const chip = screen.getByTestId("edge-legend");
+    expect((chip as HTMLElement).style.right).toBe("12px");
+    expect(chip.getAttribute("data-panel-open")).toBe("false");
+  });
+
+  // Bug #2 (visual-review 2026-04-23): after the user closes the panel
+  // via its X button, detailPanelOpen flips back to false even though
+  // selectedFileId is still set. The legend MUST snap back to the
+  // default 12px — the symptom that motivated this regression test was
+  // the legend visibly sticking out into empty space with no panel.
+  it("snaps back to 12px when the panel is manually closed while selection persists (manual-close case)", () => {
+    useSelectionStore.setState({
+      selectedFileId: "some-file",
+      detailPanelOpen: false,
+    });
+    render(<EdgeLegend />);
+    const chip = screen.getByTestId("edge-legend");
+    expect((chip as HTMLElement).style.right).toBe("12px");
   });
 });
