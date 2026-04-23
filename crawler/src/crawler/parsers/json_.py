@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json as _json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from ..graph import FileNode, ParamNode, RawRef
 
@@ -34,7 +34,7 @@ def parse(abs_path: Path, rel_path: str) -> FileNode:
     return node
 
 
-def _flatten(obj: Any, prefix: str, node: FileNode, line: Optional[int]) -> None:
+def _flatten(obj: Any, prefix: str, node: FileNode, line: int | None) -> None:
     if isinstance(obj, dict):
         # $include shortcut
         inc = obj.get("$include")

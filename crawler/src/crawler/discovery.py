@@ -8,10 +8,10 @@ from __future__ import annotations
 import fnmatch
 import logging
 import sys
+from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
-from typing import Iterator, Optional
 
-SUPPORTED_EXTS = {".xml", ".yaml", ".yml", ".json", ".ini", ".cfg"}
+SUPPORTED_EXTS = {".xml", ".xsd", ".yaml", ".yml", ".json", ".ini", ".cfg"}
 
 # Heavy/uninteresting directory names that should be pruned at walk-time so we
 # never `stat` their contents. Matched by name anywhere in the tree.
@@ -42,8 +42,8 @@ def _matches_any(posix_rel: str, patterns: list[str]) -> bool:
 def discover(
     root: Path,
     *,
-    include: Optional[list[str]] = None,
-    exclude: Optional[list[str]] = None,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
     use_default_excludes: bool = True,
 ) -> Iterator[tuple[str, Path]]:
     """Yield (relative-POSIX-path, absolute Path) for each discovered file.

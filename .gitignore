@@ -3,9 +3,20 @@ viewer/node_modules/
 viewer/dist/
 viewer/test-results/
 viewer/playwright-report/
+test-results/
+playwright-report/
+.playwright-mcp/
 viewer/public/graph.json
+viewer/public/graph-large.json
+viewer/public/graph-xlarge.json
+viewer/public/graph-xxlarge.json
 viewer/public/source/
 viewer/.vite/
+
+# Generated synthetic large-scale fixtures (deterministic, regen at test time)
+viewer/e2e/fixtures/large/
+viewer/e2e/fixtures/xlarge/
+viewer/e2e/fixtures/xxlarge/
 
 # Viewer: TypeScript-emitted sidecar artifacts (tsc -b composite leftovers)
 viewer/*.tsbuildinfo
@@ -27,8 +38,9 @@ crawler/src/*.egg-info/
 **/__pycache__/
 *.pyc
 
-# Pipeline working state
+# Pipeline working state (local-only; not for VCS)
 .claude/active-work/
+.claude/features/
 
 # Claude Code local settings (tool permissions, not for VCS)
 .claude/settings.local.json
@@ -39,3 +51,11 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Repo-root images (user screenshots + stray agent eyeball captures).
+# Don't recurse — viewer/test-results/ is already gitignored, source images intentionally tracked.
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.webp

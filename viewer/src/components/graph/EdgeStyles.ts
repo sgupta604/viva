@@ -6,13 +6,381 @@ export interface EdgeStyleSpec {
   strokeWidth: number;
 }
 
-export function edgeStyleFor(kind: EdgeKind, unresolved: boolean): EdgeStyleSpec {
-  const base: EdgeStyleSpec = { stroke: "#6b7280", strokeWidth: 1.5 };
+/**
+ * Single source of truth for per-kind edge styling AND legend rendering.
+ *
+ * Both `edgeStyleFor()` (used by GraphCanvas to color React Flow edges) and
+ * `EdgeLegend.tsx` (the always-visible chrome chip) read from this array, so
+ * a new edge kind cannot drift between renderer and legend. When a new kind
+ * is added to `EdgeKind` in `lib/graph/types.ts`, TypeScript will surface the
+ * missing entry here at compile time.
+ *
+ * `label` is the human-facing name shown in the legend chip and used as the
+ * default React Flow edge label when the edge is not aggregated.
+ */
+export interface EdgeKindMeta {
+  kind: EdgeKind;
+  color: string;
+  /** Optional dasharray for differentiating xsd from import at a glance. */
+  dasharray?: string;
+  /** Default stroke width (visually weights structural < semantic edges). */
+  strokeWidth: number;
+  /** Human-readable label for the legend chip. */
+  label: string;
+}
+
+export const EDGE_KIND_META: readonly EdgeKindMeta[] = [
+  { kind: "include", color: "#60a5fa", strokeWidth: 1.5, label: "include" },
+  { kind: "ref", color: "#fbbf24", strokeWidth: 1.5, label: "ref" },
+  { kind: "import", color: "#34d399", strokeWidth: 1.5, label: "import" },
+  {
+    kind: "xsd",
+    color: "#4ade80",
+    strokeWidth: 1.5,
+    dasharray: "6 3",
+    label: "xsd",
+  },
+  {
+    kind: "d-aggregate",
+    color: "#9ca3af",
+    strokeWidth: 1,
+    label: "d-aggregate",
+  },
+  { kind: "logical-id", color: "#f59e0b", strokeWidth: 1.5, label: "logical-id" },
+] as const;
+
+/** Unresolved edges of any kind keep the red-dashed error treatment. */
+export const UNRESOLVED_EDGE_STYLE: EdgeStyleSpec = {
+  stroke: "#ef4444",
+  strokeDasharray: "4 3",
+  strokeWidth: 1.5,
+};
+
+/**
+ * Tree-mode 2-color palette (user feedback 2026-04-22).
+ *
+ * The default tree view became unreadable with 6 colors competing on every
+ * line — the user said it was "unusable... hard to tell apart." So in tree
+ * mode we collapse to two semantic buckets:
+ *
+ *   - HIERARCHY (`d-aggregate`): structural parent-file ↔ `.d/` drop-in
+ *     containment. Same role as the box-nesting that React Flow already
+ *     draws via `parentNode`, just for the .d-style relationship that
+ *     doesn't fit the cluster model. Rendered in a low-contrast slate so
+ *     it recedes against the dark canvas.
+ *
+ *   - CROSS-REFERENCE (everything else: include / ref / import / xsd /
+ *     logical-id): semantic links between configs. Warm amber — distinct
+ *     from the cool slate hierarchy, present without shouting.
+ *
+ * Color choice (user QA 2026-04-22, Bug #2 follow-up): the previous
+ * sky-300 cross-ref accent (`#7dd3fc`) sat in the same blue family as
+ * slate-600 hierarchy and was hard to disambiguate at the trunk where
+ * cyan cross-refs overlay the slate backbone. Amber-400 (`#fbbf24`) gives
+ * the strongest cool-vs-warm contrast against slate, matches the existing
+ * cluster-mode `logical-id ×N` chip color (small palette consistency win),
+ * and the focus+context "glow" pops more brightly as amber than as light
+ * blue.
+ *
+ * Cluster mode keeps the full `EDGE_KIND_META` palette because the user
+ * said the multi-color legend is fine in the dense info-rich cluster view.
+ */
+export const TREE_HIERARCHY_COLOR = "#475569"; // slate-600 — recedes
+export const TREE_CROSSREF_COLOR = "#fbbf24"; // amber-400 — warm accent vs slate
+
+const HIERARCHY_KINDS: ReadonlySet<EdgeKind> = new Set<EdgeKind>([
+  "d-aggregate",
+]);
+
+/**
+ * Indexed lookup over `EDGE_KIND_META` so per-kind helpers (`edgeStyleFor`,
+ * `focusedCrossRefStrokeFor`) can resolve a kind → meta in O(1) instead of
+ * scanning the array. Declared up here so any helper below can reference it
+ * without a temporal dead-zone surprise.
+ */
+const META_BY_KIND: Record<EdgeKind, EdgeKindMeta> = EDGE_KIND_META.reduce(
+  (acc, m) => {
+    acc[m.kind] = m;
+    return acc;
+  },
+  {} as Record<EdgeKind, EdgeKindMeta>,
+);
+
+/**
+ * Bucket an edge kind into the tree-mode two-color scheme.
+ * Pure helper — exported for tests and the legend chip.
+ */
+export function treeEdgeBucket(kind: EdgeKind): "hierarchy" | "crossref" {
+  return HIERARCHY_KINDS.has(kind) ? "hierarchy" : "crossref";
+}
+
+export function treeEdgeColor(kind: EdgeKind): string {
+  return treeEdgeBucket(kind) === "hierarchy"
+    ? TREE_HIERARCHY_COLOR
+    : TREE_CROSSREF_COLOR;
+}
+
+/**
+ * Tree-mode counterpart to `edgeStyleFor`. Unresolved still wins (red dashed
+ * stays a hard error signal). Otherwise the kind is bucketed to the 2-color
+ * scheme; `d-aggregate` keeps its thin (1px) weight so structural lines
+ * stay visually subordinate to cross-references.
+ */
+export function treeEdgeStyleFor(
+  kind: EdgeKind,
+  unresolved: boolean,
+): EdgeStyleSpec {
   if (unresolved) {
-    return { ...base, stroke: "#ef4444", strokeDasharray: "4 3" };
+    return { ...UNRESOLVED_EDGE_STYLE };
   }
-  if (kind === "include") return { ...base, stroke: "#60a5fa" };
-  if (kind === "ref") return { ...base, stroke: "#fbbf24" };
-  if (kind === "import") return { ...base, stroke: "#34d399" };
-  return base;
+  const bucket = treeEdgeBucket(kind);
+  return {
+    stroke: bucket === "hierarchy" ? TREE_HIERARCHY_COLOR : TREE_CROSSREF_COLOR,
+    strokeWidth: bucket === "hierarchy" ? 1 : 1.5,
+  };
+}
+
+/**
+ * Should this edge swallow pointer events? In flat modes (dendrogram/tree)
+ * the `d-aggregate` hierarchy edges are decorative backbone — they draw
+ * the spine of the tree but are not user-interactive. Without this guard
+ * they sit above tree-folder cards (zIndex 1000 vs the React Flow node
+ * default) and intercept Playwright's strict-actionability click — which
+ * was the root cause of the dendrogram-layout E2E "expand round-trip"
+ * failure. Cross-ref edges (include/import/ref/xsd/logical-id) stay
+ * clickable in every mode; cluster mode keeps hierarchy edges clickable
+ * because cluster boxes ARE legitimate edge endpoints in that view.
+ *
+ * Pure helper, exported for the GraphCanvas edge mapper AND for tests
+ * that lock the invariant.
+ */
+export function shouldDisablePointerEvents(
+  kind: EdgeKind,
+  isFlatMode: boolean,
+): boolean {
+  return isFlatMode && kind === "d-aggregate";
+}
+
+/**
+ * Focus + context dimming for cross-reference edges. User feedback
+ * 2026-04-22: dendrogram mode's "dim by default, light up touching edges
+ * when a tile is focused" interaction is the gold standard. Apply the SAME
+ * pattern uniformly across all three layouts (dendrogram, tree, clusters)
+ * so navigation feels consistent — clusters previously kept everything full
+ * opacity and only soft-dimmed unrelated edges, which the user found noisy
+ * ("all of them are highlighted by default").
+ *
+ * Default state (no focus, in any mode): cross-ref edges render at 0.15
+ * opacity so the layout structure reads cleanly and references recede into
+ * a faint lattice of "there are connections here, hover to investigate."
+ *
+ * Focused state (hover OR selection on either endpoint): cross-ref edges
+ * touching the focused node return to full opacity so the user can trace
+ * what THIS node references and is referenced by.
+ *
+ * Hierarchy (`d-aggregate`) edges always render full opacity here — they're
+ * structural backbone. Hierarchy backbone dimming-on-focus is handled by
+ * `hierarchyOpacityFor` (it dims to 0.4 when something else is focused so
+ * the lit cross-refs own the foreground).
+ *
+ * Pure helper — same `(kind, isFocused)` always returns the same opacity.
+ * Exported for the GraphCanvas edge mapper AND for tests.
+ *
+ * The legacy `isFlatMode` and `anythingFocused` parameters are accepted but
+ * ignored. They're retained for backward compat with any older test sites
+ * still passing 3 or 4 args; new call sites should pass `(kind, isFocused)`
+ * (the unused params default to `false`).
+ */
+export const CROSSREF_DIM_OPACITY = 0.15;
+export const CROSSREF_FULL_OPACITY = 1;
+
+export function crossRefOpacityFor(
+  kind: EdgeKind,
+  // Legacy positional-arg slot (was `isFlatMode`). Kept so existing test
+  // call sites compile; the helper's behavior no longer branches on mode.
+  _isFlatMode: boolean,
+  isFocused: boolean,
+  // Legacy positional-arg slot (was `anythingFocused`, drove the old cluster
+  // soft-dim path). Cluster mode now matches the dendrogram pattern, so this
+  // flag is irrelevant — kept only so legacy 4-arg call sites still type-check.
+  _anythingFocused: boolean = false,
+): number {
+  // Hierarchy edges in any mode: never participate in the cross-ref dim
+  // path. Their dim-on-focus behavior lives in `hierarchyOpacityFor`.
+  if (kind === "d-aggregate") return CROSSREF_FULL_OPACITY;
+  // Uniform behavior across all modes: dim by default, full when THIS edge's
+  // endpoint is focused.
+  return isFocused ? CROSSREF_FULL_OPACITY : CROSSREF_DIM_OPACITY;
+}
+
+/**
+ * Hit-target width for an edge's invisible interaction layer (React Flow's
+ * `interactionWidth` prop — defaults to 20px). When a cross-ref edge is
+ * dimmed to 0.15 opacity, its visible stroke is barely perceptible but the
+ * 20px-wide interaction overlay still intercepts every pointer event passing
+ * through it. That broke node-hover the user expects: trying to hover a file
+ * behind a faint edge silently failed because the edge's hit-zone ate the
+ * move.
+ *
+ * Fix: when the edge is dimmed, drop its interaction width to 0. The visible
+ * path stays drawn (so the dim hint of "there's a connection here" persists),
+ * but it stops swallowing pointer events. The moment the edge is focused
+ * (hover/select on either endpoint) it returns to the default 20px hit-zone
+ * so the user can click the now-bright edge to inspect it.
+ *
+ * Hierarchy (`d-aggregate`) edges keep their full hit-zone in every mode —
+ * they don't participate in the cross-ref dim path.
+ *
+ * Pure helper, exported for the GraphCanvas edge mapper AND for tests. The
+ * `isFlatMode` parameter is retained for backward-compat call sites; the
+ * helper no longer branches on mode now that cluster mode matches the
+ * dendrogram dim-by-default pattern.
+ */
+export const CROSSREF_INTERACTION_WIDTH_FOCUSED = 20;
+export const CROSSREF_INTERACTION_WIDTH_DIMMED = 0;
+
+export function crossRefInteractionWidthFor(
+  kind: EdgeKind,
+  // Legacy positional slot (was `isFlatMode`). Ignored — uniform behavior now.
+  _isFlatMode: boolean,
+  isFocused: boolean,
+): number {
+  // Mirror crossRefOpacityFor: an edge that doesn't dim must keep its
+  // hit-zone, otherwise we'd silently make permanently-bright edges
+  // unclickable. d-aggregate hierarchy edges never dim, so their hit-zone
+  // stays open in every mode.
+  if (kind === "d-aggregate") return CROSSREF_INTERACTION_WIDTH_FOCUSED;
+  return isFocused
+    ? CROSSREF_INTERACTION_WIDTH_FOCUSED
+    : CROSSREF_INTERACTION_WIDTH_DIMMED;
+}
+
+/**
+ * Focus-revealed per-kind palette for cross-reference edges in flat
+ * (dendrogram/tree) modes. User feedback 2026-04-22 (Option D from research):
+ * the default amber-everywhere palette stays calm, but when a node is
+ * focused the LIT cross-ref edges switch from amber to their per-kind color
+ * from `EDGE_KIND_META` so the user can see WHICH kind each connection is.
+ *
+ * Default state (no focus): cross-ref edges render amber (`TREE_CROSSREF_COLOR`)
+ * — the calm dim-amber lattice the user praised.
+ *
+ * Focused state (hover OR selection on either endpoint): cross-ref edges
+ * touching the focused node render at their per-kind color from
+ * `EDGE_KIND_META` (include blue / import green / xsd green-dashed etc.).
+ *
+ * Cluster mode is unchanged — it already paints every cross-ref with its
+ * per-kind color all the time. The helper short-circuits to
+ * `EDGE_KIND_META[kind].color` so callers can use it uniformly.
+ *
+ * Hierarchy (`d-aggregate`) edges always return `TREE_HIERARCHY_COLOR` in
+ * flat mode (the slate backbone) and the hierarchy meta color in cluster
+ * mode — they're never re-themed by focus because they're structural, not
+ * semantic.
+ *
+ * Mirrors the `(kind, isFlatMode, isFocused)` shape of `crossRefOpacityFor`
+ * + `crossRefInteractionWidthFor` so the three helpers stay in lockstep.
+ */
+export function focusedCrossRefStrokeFor(
+  kind: EdgeKind,
+  isFlatMode: boolean,
+  isFocused: boolean,
+): string {
+  // Cluster mode: always per-kind color (existing behavior).
+  if (!isFlatMode) {
+    return META_BY_KIND[kind]?.color ?? TREE_CROSSREF_COLOR;
+  }
+  // Flat mode hierarchy: always the slate backbone color.
+  if (kind === "d-aggregate") return TREE_HIERARCHY_COLOR;
+  // Flat-mode cross-ref: per-kind color when focused, amber otherwise.
+  if (isFocused) {
+    return META_BY_KIND[kind]?.color ?? TREE_CROSSREF_COLOR;
+  }
+  return TREE_CROSSREF_COLOR;
+}
+
+/**
+ * Hierarchy backbone dim-on-focus. User feedback 2026-04-22: when a node is
+ * focused, lit cross-refs need to own the foreground. The full-opacity
+ * hierarchy backbone competes for attention even though it's a low-contrast
+ * color; dropping it to ~40% opacity keeps the spine visible as context but
+ * lets the focused per-kind cross-refs pop.
+ *
+ * Default state (no focus): hierarchy renders at full opacity — the
+ * backbone is the primary structure cue and must read clearly.
+ *
+ * Focused state (any node hovered or selected): hierarchy dims to 0.4 —
+ * visible enough to ground the focused subgraph in the tree's structure,
+ * faint enough to recede behind the lit cross-refs. Applied uniformly in
+ * every mode now: in cluster mode the d-aggregate edges between cluster
+ * boxes and their drop-in files are still legitimate "structural backbone"
+ * worth dimming when the user is investigating a specific node, so the
+ * dendrogram pattern carries over cleanly.
+ *
+ * The legacy `isFlatMode` parameter is accepted but ignored. Retained so
+ * existing call sites compile during the cluster-mode unification.
+ */
+export const HIERARCHY_DIM_OPACITY = 0.4;
+export const HIERARCHY_FULL_OPACITY = 1;
+
+export function hierarchyOpacityFor(
+  // Legacy positional slot (was `isFlatMode`). Ignored — uniform behavior now.
+  _isFlatMode: boolean,
+  isFocused: boolean,
+): number {
+  return isFocused ? HIERARCHY_DIM_OPACITY : HIERARCHY_FULL_OPACITY;
+}
+
+/**
+ * 2-row legend metadata for tree mode. Keeps the same `EdgeKindMeta` shape
+ * the legend already iterates over (label + color + strokeWidth), so the
+ * EdgeLegend component can switch arrays without restructuring its JSX.
+ *
+ * `kind` is repurposed as a bucket key here ("hierarchy" / "reference") —
+ * it's only used for `data-testid="edge-legend-item-${kind}"` and to track
+ * which row is which; it does NOT have to match an `EdgeKind` value because
+ * tree mode never reads it back as an edge kind.
+ */
+export interface TreeLegendRow {
+  bucket: "hierarchy" | "reference";
+  color: string;
+  strokeWidth: number;
+  label: string;
+}
+
+export const TREE_LEGEND_ROWS: readonly TreeLegendRow[] = [
+  {
+    bucket: "hierarchy",
+    color: TREE_HIERARCHY_COLOR,
+    strokeWidth: 1,
+    label: "hierarchy",
+  },
+  {
+    bucket: "reference",
+    color: TREE_CROSSREF_COLOR,
+    strokeWidth: 1.5,
+    label: "reference",
+  },
+] as const;
+
+/**
+ * Per-kind edge styling. v1 kinds (include/ref/import) unchanged; v2 adds:
+ *   - xsd          → dashed green
+ *   - d-aggregate  → subtle gray (structural, not conceptual)
+ *   - logical-id   → solid amber
+ *
+ * Unresolved edges of any kind keep the red-dashed error treatment.
+ */
+export function edgeStyleFor(kind: EdgeKind, unresolved: boolean): EdgeStyleSpec {
+  if (unresolved) {
+    return { ...UNRESOLVED_EDGE_STYLE };
+  }
+  const meta = META_BY_KIND[kind];
+  if (!meta) {
+    // Defensive fallback — should be unreachable because EdgeKind is closed.
+    return { stroke: "#6b7280", strokeWidth: 1.5 };
+  }
+  const spec: EdgeStyleSpec = { stroke: meta.color, strokeWidth: meta.strokeWidth };
+  if (meta.dasharray) spec.strokeDasharray = meta.dasharray;
+  return spec;
 }

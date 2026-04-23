@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ReactFlowProvider } from "reactflow";
 import { loadGraph, type LoadResult } from "@/lib/graph/load";
 import { useGraphStore } from "@/lib/state/graph-store";
 import { useSelectionStore } from "@/lib/state/selection-store";
@@ -27,7 +28,23 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
-    loadGraph()
+    // Query-param driven fixture selection (FPS bench + scale tests):
+    //   ?graph=large    → /graph-large.json     (~3k files)
+    //   ?graph=xlarge   → /graph-xlarge.json    (~5k files)
+    //   ?graph=xxlarge  → /graph-xxlarge.json   (~10k files)
+    //   default         → /graph.json
+    // Offline-safe — all files sit in the Vite-served public/ OR dist/ tree.
+    const params = new URLSearchParams(window.location.search);
+    const which = params.get("graph");
+    const url =
+      which === "xxlarge"
+        ? "/graph-xxlarge.json"
+        : which === "xlarge"
+          ? "/graph-xlarge.json"
+          : which === "large"
+            ? "/graph-large.json"
+            : "/graph.json";
+    loadGraph(url)
       .then((result: LoadResult) => {
         if (cancelled) return;
         if (result.ok) {
@@ -70,47 +87,51 @@ export default function App() {
     }
   }, [status, resetFilters]);
 
+  // ReactFlowProvider wraps the whole app so FilterBar's useReactFlow()
+  // (for jump-to-folder fitBounds) is valid regardless of view-mode.
   return (
-    <div className="flex h-full w-full flex-col bg-neutral-950 text-neutral-100">
-      <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
-        <div className="flex items-center gap-3">
-          <h1 className="font-mono text-lg font-semibold tracking-tight">viva</h1>
-          <span className="text-xs text-neutral-500">config visualizer</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-neutral-400">
-          <kbd className="rounded border border-neutral-700 px-1.5 py-0.5 font-mono">Ctrl/Cmd+K</kbd>
-          <span>search</span>
-        </div>
-      </header>
-
-      <FilterBar />
-      <ViewModeBar />
-
-      <main className="relative flex-1 overflow-hidden">
-        {status === "loading" && (
-          <div className="flex h-full items-center justify-center text-neutral-400">
-            loading graph…
+    <ReactFlowProvider>
+      <div className="flex h-full w-full flex-col bg-neutral-950 text-neutral-100">
+        <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
+          <div className="flex items-center gap-3">
+            <h1 className="font-mono text-lg font-semibold tracking-tight">viva</h1>
+            <span className="text-xs text-neutral-500">config visualizer</span>
           </div>
-        )}
-        {status === "error" && (
-          <div
-            role="alert"
-            className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center"
-          >
-            <div className="font-semibold text-red-400">graph.json failed to load</div>
-            <code className="max-w-xl font-mono text-xs text-neutral-400">{error}</code>
-            <p className="text-xs text-neutral-500">
-              Run the crawler and copy the output to <code>viewer/public/graph.json</code>.
-            </p>
+          <div className="flex items-center gap-2 text-xs text-neutral-400">
+            <kbd className="rounded border border-neutral-700 px-1.5 py-0.5 font-mono">Ctrl/Cmd+K</kbd>
+            <span>search</span>
           </div>
-        )}
-        {status === "ready" && viewMode === "graph" && <GraphCanvas />}
-        {status === "ready" && viewMode === "folders" && <FolderView />}
-        {status === "ready" && viewMode === "table" && <TableView />}
-      </main>
+        </header>
 
-      <FileDetailPanel />
-      <SearchPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-    </div>
+        <FilterBar />
+        <ViewModeBar />
+
+        <main className="relative flex-1 overflow-hidden">
+          {status === "loading" && (
+            <div className="flex h-full items-center justify-center text-neutral-400">
+              loading graph…
+            </div>
+          )}
+          {status === "error" && (
+            <div
+              role="alert"
+              className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center"
+            >
+              <div className="font-semibold text-red-400">graph.json failed to load</div>
+              <code className="max-w-xl font-mono text-xs text-neutral-400">{error}</code>
+              <p className="text-xs text-neutral-500">
+                Run the crawler and copy the output to <code>viewer/public/graph.json</code>.
+              </p>
+            </div>
+          )}
+          {status === "ready" && viewMode === "graph" && <GraphCanvas />}
+          {status === "ready" && viewMode === "folders" && <FolderView />}
+          {status === "ready" && viewMode === "table" && <TableView />}
+        </main>
+
+        <FileDetailPanel />
+        <SearchPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      </div>
+    </ReactFlowProvider>
   );
 }

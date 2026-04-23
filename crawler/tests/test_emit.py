@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 
 from crawler.emit import to_json, write
-from crawler.graph import Edge, FileNode, Graph, ParamNode
+from crawler.graph import ClusterNode, Edge, FileNode, Graph, ParamNode
 
 
 def _tiny_graph(generated_at=None):
@@ -67,3 +67,37 @@ def test_emits_sorted_files_and_params():
     assert [f["path"] for f in payload["files"]] == ["a.xml", "b.xml"]
     b_params = [f["params"] for f in payload["files"] if f["path"] == "b.xml"][0]
     assert [p["key"] for p in b_params] == ["a", "z"]
+
+
+# --- v2 emission -------------------------------------------------------------
+
+
+def test_emit_v2_round_trips_clusters_and_generated_flags():
+    """F.2: v2 emission round-trips through json.loads with camelCase boundary."""
+    import json as _json
+
+    f = FileNode(
+        id="a",
+        path="tpl/out.xml",
+        name="out.xml",
+        folder="tpl",
+        kind="xml",
+        size_bytes=0,
+        generated=True,
+        generated_from="tpl/manifest.yaml",
+    )
+    c = ClusterNode(
+        path="tpl",
+        parent=None,
+        child_files=["a"],
+        child_clusters=[],
+        kind="folder",
+    )
+    e = Edge("a", "a", "d-aggregate", None, attrs={"order": 3})
+    g = Graph(root="r", files=[f], edges=[e], clusters=[c])
+    payload = _json.loads(to_json(g))
+    assert payload["version"] == 2
+    assert payload["clusters"][0]["childFiles"] == ["a"]
+    assert payload["files"][0]["generated"] is True
+    assert payload["files"][0]["generatedFrom"] == "tpl/manifest.yaml"
+    assert payload["edges"][0]["attrs"] == {"order": 3}

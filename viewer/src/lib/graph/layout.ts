@@ -28,6 +28,37 @@ export interface LaidOutGraph {
 export const NODE_W = 224;
 export const NODE_H = 76;
 
+// ---------------------------------------------------------------------------
+// v2 cluster-layout dimensions (large-codebase-viewer)
+// Single source of truth for ClusterNode.tsx and cluster-layout.ts. Consumers
+// MUST import these rather than hard-code — lesson from xml-viewer-hardening
+// 26f948f (FileNode width drift against dagre layout slot).
+// ---------------------------------------------------------------------------
+/** Header strip of an expanded cluster: title + toggle + child-count badge. */
+export const CLUSTER_HEADER_HEIGHT = 32;
+/** Inner padding inside an expanded cluster before first child tile. */
+export const CLUSTER_PADDING = 16;
+/** Width of a collapsed cluster tile (shown at overview zoom). */
+export const COLLAPSED_CLUSTER_W = 220;
+/** Height of a collapsed cluster tile. */
+export const COLLAPSED_CLUSTER_H = 64;
+
+// ---------------------------------------------------------------------------
+// v3 tree (dendrogram) layout dimensions — small text-label cards so the
+// dendrogram has even ranks and the whole hierarchy reads as a tree (matches
+// the user's "Research Graph Datasets" reference image). Folders + files are
+// roughly the same size in tree mode, distinguished by fill/border styling
+// rather than dimensions.
+// ---------------------------------------------------------------------------
+/** Width reserved for a tree-mode folder card. */
+export const TREE_FOLDER_W = 168;
+/** Height reserved for a tree-mode folder card. */
+export const TREE_FOLDER_H = 36;
+/** Width reserved for a tree-mode file card (matches folder for even ranks). */
+export const TREE_FILE_W = 180;
+/** Height reserved for a tree-mode file card. */
+export const TREE_FILE_H = 36;
+
 /**
  * Compute a deterministic, folder-aware dagre layout. Called on the filtered
  * graph; memoize at the caller. Two calls with the same input produce identical

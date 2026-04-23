@@ -5,8 +5,8 @@ escape `parsers/xml.py`; ruamel types must not escape `parsers/yaml.py`.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 from ..discovery import is_test_path
 from ..graph import FileKind, FileNode, stable_id
@@ -19,6 +19,12 @@ ParseFn = Callable[[Path, str], FileNode]
 
 _EXT_TO_PARSER: dict[str, tuple[FileKind, ParseFn]] = {
     ".xml": ("xml", xml_parser.parse),
+    # XSD is an XML document; route through the xml parser so xsi:* attrs on
+    # consumers resolve to the .xsd file as a graph node. kind stays "xml" —
+    # v2 schema keeps FileKind a closed 4-enum to avoid a cascading
+    # FileNode.kind change across the viewer. Distinguish XSD visually later
+    # via the file extension, not a new FileKind.
+    ".xsd": ("xml", xml_parser.parse),
     ".yaml": ("yaml", yaml_parser.parse),
     ".yml": ("yaml", yaml_parser.parse),
     ".json": ("json", json_parser.parse),
@@ -27,7 +33,7 @@ _EXT_TO_PARSER: dict[str, tuple[FileKind, ParseFn]] = {
 }
 
 
-def parse_file(rel_posix_path: str, abs_path: Path) -> Optional[FileNode]:
+def parse_file(rel_posix_path: str, abs_path: Path) -> FileNode | None:
     """Dispatch to the right parser. Returns None for unknown extensions."""
     entry = _EXT_TO_PARSER.get(abs_path.suffix.lower())
     if entry is None:
@@ -45,6 +51,6 @@ def parse_file(rel_posix_path: str, abs_path: Path) -> Optional[FileNode]:
     return node
 
 
-def kind_for_extension(ext: str) -> Optional[FileKind]:
+def kind_for_extension(ext: str) -> FileKind | None:
     entry = _EXT_TO_PARSER.get(ext.lower())
     return entry[0] if entry else None

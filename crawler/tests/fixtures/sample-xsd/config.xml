@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="urn:ex ./schema.xsd"
+      xsi:noNamespaceSchemaLocation="./nons.xsd">
+  <item id="a" value="1"/>
+</root>

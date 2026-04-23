@@ -17,7 +17,8 @@ describe("loadGraph", () => {
     });
     const result = await loadGraph();
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.graph.version).toBe(1);
+    // Fixture is v2 after the large-codebase-viewer foundation regen.
+    if (result.ok) expect([1, 2]).toContain(result.graph.version);
   });
 
   it("returns network error on non-ok response", async () => {

@@ -79,6 +79,29 @@ def test_dogfood_xi_include_parses_clean():
 
 
 @pytest.mark.integration
+def test_dogfood_recrawl_byte_identical():
+    """Re-crawl invariant (C.6 / Risk #11).
+
+    Crawling the viva repo twice must produce byte-identical graph JSON.
+    The xml-viewer-hardening post-finalize lesson: the emit-sources sidecar
+    was producing different output on re-run because it wasn't excluded from
+    walk. The fix (dd2f273) prevented the feedback loop; THIS test makes it
+    regression-proof.
+    """
+    import json
+
+    from crawler.emit import to_json
+
+    g1 = to_json(crawl(REPO_ROOT, no_timestamp=True))
+    g2 = to_json(crawl(REPO_ROOT, no_timestamp=True))
+    # Compare structurally rather than raw bytes — timestamps aside, emit is
+    # deterministic by design. json.loads to give a helpful diff on mismatch.
+    assert json.loads(g1) == json.loads(g2), (
+        "dogfood: re-crawl produced a different graph — feedback loop?"
+    )
+
+
+@pytest.mark.integration
 def test_dogfood_graph_is_bounded():
     """Sanity ceiling: the crawler shouldn't be pulling in anything absurd.
 

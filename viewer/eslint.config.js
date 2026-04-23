@@ -21,9 +21,16 @@ const browserGlobals = {
   Request: "readonly",
   Response: "readonly",
   AbortController: "readonly",
+  // Worker is a standard browser global; needed by layout.worker.ts which
+  // spawns elk's classic worker via `new Worker(elkWorkerUrl)` (post-fix
+  // for the tree-layout-redesign worker hang, diagnosis 2026-04-22).
+  Worker: "readonly",
   setTimeout: "readonly",
   clearTimeout: "readonly",
   localStorage: "readonly",
+  sessionStorage: "readonly",
+  Storage: "readonly",
+  URLSearchParams: "readonly",
   JSX: "readonly",
 };
 

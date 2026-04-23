@@ -19,14 +19,14 @@ def parse(abs_path: Path, rel_path: str) -> FileNode:
     cp = configparser.ConfigParser(interpolation=None, strict=False)
     cp.optionxform = str  # type: ignore[assignment]
     try:
-        with open(abs_path, "r", encoding="utf-8") as fh:
+        with open(abs_path, encoding="utf-8") as fh:
             cp.read_file(fh)
     except configparser.Error as e:
         node.parse_error = f"{type(e).__name__}: {e}"
         return node
     except UnicodeDecodeError:
         try:
-            with open(abs_path, "r", encoding="latin-1") as fh:
+            with open(abs_path, encoding="latin-1") as fh:
                 cp.read_file(fh)
         except Exception as e:
             node.parse_error = f"{type(e).__name__}: {e}"

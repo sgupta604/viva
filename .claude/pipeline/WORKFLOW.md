@@ -46,6 +46,20 @@ Runs: pytest (crawler) + Vitest (viewer) + Playwright (E2E) + lint + typecheck +
 
 **Exit gate (pass):** All suites pass, build succeeds, lint/typecheck clean, checklist verified.
 
+### 5.0 Visual Review (auto-gated, between Test PASS and Finalize)
+**Writes:** `.claude/active-work/<feature>/visual-review.md`
+
+**Trigger:** the `/test` PASS report lists at least one modified file matching `viewer/src/components/graph/**` OR `viewer/src/components/views/**`. Backend-only / crawler-only / pipeline-doc-only changes auto-skip this phase.
+
+**What happens:**
+1. Test-agent copies `.claude/templates/visual-review.md` to `.claude/active-work/<feature>/visual-review.md` and fills the screenshot manifest table with paths to every PNG it captured during E2E.
+2. Orchestrator surfaces that file path to the user. Does NOT auto-suggest `/finalize`.
+3. User opens each screenshot, walks the 10-item checklist, and either approves ("looks good") or rejects (loops back to `/diagnose` or `/quickfix`).
+
+**Why this exists:** programmatic visual checks (`visual-verify*.mjs`, FPS percentiles, bbox overlap) cannot detect labels-on-borders, edges-under-fills, or unexplained color palettes — exactly the regression class that motivated `tree-layout-redesign`. A human eyeball is the only reliable detector for that class. Reference: `.claude/templates/visual-review.md` and the human checklist at `viewer/scripts/visual-review-checklist.md`.
+
+**Exit gate:** literal "looks good" (or explicit equivalent) from the user.
+
 ### 5a. Finalize → finalize-agent
 **Writes:** `.claude/features/<feature>/SUMMARY.md` (includes retrospective)
 

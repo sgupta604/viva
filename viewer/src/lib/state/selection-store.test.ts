@@ -21,4 +21,53 @@ describe("selection store", () => {
     expect(s.selectedFileId).toBeNull();
     expect(s.selectedParamKey).toBeNull();
   });
+
+  it("hoverNode sets and clears the hovered id without disturbing selection", () => {
+    useSelectionStore.getState().selectFile("file-1");
+    useSelectionStore.getState().hoverNode("file-2");
+    let s = useSelectionStore.getState();
+    expect(s.selectedFileId).toBe("file-1");
+    expect(s.hoveredNodeId).toBe("file-2");
+
+    useSelectionStore.getState().hoverNode(null);
+    s = useSelectionStore.getState();
+    expect(s.selectedFileId).toBe("file-1");
+    expect(s.hoveredNodeId).toBeNull();
+  });
+
+  it("clear also wipes hover state", () => {
+    useSelectionStore.getState().selectFile("a");
+    useSelectionStore.getState().hoverNode("b");
+    useSelectionStore.getState().clear();
+    const s = useSelectionStore.getState();
+    expect(s.selectedFileId).toBeNull();
+    expect(s.hoveredNodeId).toBeNull();
+  });
+
+  it("detailPanelOpen defaults to false", () => {
+    expect(useSelectionStore.getState().detailPanelOpen).toBe(false);
+  });
+
+  it("openDetailPanel and closeDetailPanel toggle the flag without touching selection", () => {
+    useSelectionStore.getState().selectFile("file-1");
+    useSelectionStore.getState().openDetailPanel();
+    let s = useSelectionStore.getState();
+    expect(s.detailPanelOpen).toBe(true);
+    expect(s.selectedFileId).toBe("file-1");
+
+    useSelectionStore.getState().closeDetailPanel();
+    s = useSelectionStore.getState();
+    expect(s.detailPanelOpen).toBe(false);
+    // selection survives — user can still see selection ring + lit edges.
+    expect(s.selectedFileId).toBe("file-1");
+  });
+
+  it("clear also closes the detail panel", () => {
+    useSelectionStore.getState().selectFile("a");
+    useSelectionStore.getState().openDetailPanel();
+    useSelectionStore.getState().clear();
+    const s = useSelectionStore.getState();
+    expect(s.selectedFileId).toBeNull();
+    expect(s.detailPanelOpen).toBe(false);
+  });
 });
