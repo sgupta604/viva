@@ -35,6 +35,7 @@ def resolve_references(
     files: list[FileNode],
     *,
     logical_id_max_cardinality: int = DEFAULT_LOGICAL_ID_MAX_CARDINALITY,
+    logical_id_whitelist: set[str] | None = None,
 ) -> list[Edge]:
     by_path: dict[str, FileNode] = {f.path: f for f in files}
     by_param_key: dict[str, list[FileNode]] = {}
@@ -67,6 +68,7 @@ def resolve_references(
             if raw.kind == "logical-id":
                 _resolve_logical_id_ref(
                     edges, src, raw, logical_index, logical_id_max_cardinality,
+                    logical_id_whitelist,
                 )
                 continue
             # include / ref / import / d-aggregate fall through to the v1 resolver.
@@ -132,17 +134,23 @@ def _resolve_logical_id_ref(
     raw,
     logical_index: dict[str, list[FileNode]],
     max_cardinality: int,
+    whitelist: set[str] | None = None,
 ) -> None:
     """Logical-ID resolver with specificity + cardinality caps.
 
     - skip purely-integer IDs (`123`): too noisy (Risk #3)
     - skip single-character IDs: likewise
     - skip IDs declared by > max_cardinality files: noisy and fan-out-heavy
+    - skip IDs not in `whitelist` when one is supplied (AND with cardinality)
     No edge is emitted for caps — NOT a unresolved edge. Diagnostics stay in
     logs; this keeps the graph clean per the user's "edges I can trust" rule.
     """
     lid = raw.raw
     if len(lid) < 2 or lid.isdigit():
+        return
+    # Whitelist filter — empty set is treated identically to None so the
+    # default-flag emission stays byte-identical (polish-batch-1 invariant).
+    if whitelist is not None and len(whitelist) > 0 and lid not in whitelist:
         return
     decls = logical_index.get(lid, [])
     if not decls:
