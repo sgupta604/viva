@@ -70,14 +70,23 @@ export const UNRESOLVED_EDGE_STYLE: EdgeStyleSpec = {
  *     it recedes against the dark canvas.
  *
  *   - CROSS-REFERENCE (everything else: include / ref / import / xsd /
- *     logical-id): semantic links between configs. Soft cyan — distinct
- *     from hierarchy, present without shouting.
+ *     logical-id): semantic links between configs. Warm amber — distinct
+ *     from the cool slate hierarchy, present without shouting.
+ *
+ * Color choice (user QA 2026-04-22, Bug #2 follow-up): the previous
+ * sky-300 cross-ref accent (`#7dd3fc`) sat in the same blue family as
+ * slate-600 hierarchy and was hard to disambiguate at the trunk where
+ * cyan cross-refs overlay the slate backbone. Amber-400 (`#fbbf24`) gives
+ * the strongest cool-vs-warm contrast against slate, matches the existing
+ * cluster-mode `logical-id ×N` chip color (small palette consistency win),
+ * and the focus+context "glow" pops more brightly as amber than as light
+ * blue.
  *
  * Cluster mode keeps the full `EDGE_KIND_META` palette because the user
  * said the multi-color legend is fine in the dense info-rich cluster view.
  */
 export const TREE_HIERARCHY_COLOR = "#475569"; // slate-600 — recedes
-export const TREE_CROSSREF_COLOR = "#7dd3fc"; // sky-300 — soft accent
+export const TREE_CROSSREF_COLOR = "#fbbf24"; // amber-400 — warm accent vs slate
 
 const HIERARCHY_KINDS: ReadonlySet<EdgeKind> = new Set<EdgeKind>([
   "d-aggregate",

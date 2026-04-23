@@ -124,6 +124,14 @@ describe("treeEdgeStyleFor", () => {
     }
   });
 
+  it("uses amber-400 for the cross-ref accent (warm contrast vs slate hierarchy)", () => {
+    // Lock the literal so a future "let's try cyan / coral / emerald"
+    // lands as a single deliberate edit. User chose amber `#fbbf24`
+    // (2026-04-22) for the strongest cool-vs-warm contrast against the
+    // slate hierarchy backbone in dendrogram mode.
+    expect(TREE_CROSSREF_COLOR).toBe("#fbbf24");
+  });
+
   it("preserves the unresolved error treatment for any kind", () => {
     for (const k of [
       "include",
@@ -139,13 +147,28 @@ describe("treeEdgeStyleFor", () => {
     }
   });
 
-  it("never re-uses any color from the cluster-mode palette for tree mode", () => {
-    // Confirms the new tree palette is genuinely distinct — if a future
-    // refactor accidentally points tree colors at one of the cluster
-    // colors, this guard fires.
+  it("hierarchy color never re-uses any cluster-mode palette entry", () => {
+    // The hierarchy color must stay distinct from every cluster-mode kind
+    // — slate is the structural recede color and shouldn't be confused
+    // with any semantic edge type.
     const clusterColors = new Set(EDGE_KIND_META.map((m) => m.color));
     expect(clusterColors.has(TREE_HIERARCHY_COLOR)).toBe(false);
-    expect(clusterColors.has(TREE_CROSSREF_COLOR)).toBe(false);
+  });
+
+  it("cross-ref color is intentionally the same warm amber as cluster `ref` kind", () => {
+    // Cross-mode palette consistency (user QA 2026-04-22): the flat-mode
+    // cross-ref accent and the cluster-mode `ref` chip both render as
+    // amber-400 (`#fbbf24`) on purpose so a user moving between layouts
+    // sees the same warm "this is a reference" hue. The previous disjoint-
+    // palette guard was over-strict; the ONLY allowed overlap is this one
+    // amber, asserted explicitly so any other accidental cluster-color
+    // reuse still fires.
+    const refMeta = EDGE_KIND_META.find((m) => m.kind === "ref");
+    expect(refMeta?.color).toBe(TREE_CROSSREF_COLOR);
+    const otherClusterColors = EDGE_KIND_META.filter((m) => m.kind !== "ref").map(
+      (m) => m.color,
+    );
+    expect(otherClusterColors).not.toContain(TREE_CROSSREF_COLOR);
   });
 });
 
