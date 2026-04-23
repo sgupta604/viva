@@ -297,6 +297,75 @@ function toElkNode(entry: VisibleEntry): ElkNode {
   };
 }
 
+/**
+ * Post-ELK bottom-up bbox tightening pass.
+ *
+ * **Why this exists.** Tree-mode containment overflow (Bug #1, image #16):
+ * when a sub-cluster is expanded inside a parent, the parent's `width`/
+ * `height` from ELK didn't always cover the expanded child's extents. The
+ * symptom in the browser was a child cluster's tile bursting through the
+ * bottom edge of its parent box and visually colliding with the next row of
+ * top-level clusters. On the xlarge fixture (4,794 nodes) reproducing this
+ * with `top00 > mid00 expanded` produced a 32px right-overflow + 192px
+ * bottom-overflow at the React Flow node-coordinate level.
+ *
+ * **Root cause.** ELK mrtree honors the per-node `elk.padding` we pass for
+ * expanded clusters, but doesn't always grow the parent enough when a
+ * descendant's subtree expands at the same call. The leaf widths/heights
+ * we pass for COLLAPSED clusters reserve the right amount; for an EXPANDED
+ * cluster (no width/height passed), ELK computes the container size — but
+ * not always tight enough to contain a deeply-expanded grandchild whose
+ * own bbox came back with extra slack. So we walk the result tree
+ * bottom-up after layout and tighten each compound node's dimensions to
+ * `max(child.x + child.width) + padding` so containment is guaranteed.
+ *
+ * **Why the bottom-up walk.** A child's tightened size feeds into the
+ * parent's tightened size. Walking children-first ensures we read the
+ * child's true post-tightening bbox when computing the parent.
+ *
+ * **Padding.** `CLUSTER_HEADER_HEIGHT + CLUSTER_PADDING` on top, `CLUSTER_PADDING`
+ * on the other three sides — same per-side budget the ELK input declares
+ * via `elk.padding`. Any drift between this and `toElkNode` is itself a
+ * bug, hence the constants are imported from the same `layout.ts` source.
+ *
+ * Pure / idempotent — runs in-place on the ElkNode tree but the same input
+ * always produces the same output. Safe to memoize at the caller.
+ */
+function tightenContainmentBboxes(node: ElkNode): void {
+  if (!node.children || node.children.length === 0) return;
+  // Recurse first so children sizes are already tightened.
+  for (const child of node.children) tightenContainmentBboxes(child);
+
+  // Compute the union right/bottom of all children. Children with no
+  // explicit position (shouldn't happen post-ELK, but defensive) contribute
+  // nothing and are skipped.
+  let maxRight = 0;
+  let maxBottom = 0;
+  for (const child of node.children) {
+    const cx = child.x ?? 0;
+    const cy = child.y ?? 0;
+    const cw = child.width ?? 0;
+    const ch = child.height ?? 0;
+    if (cx + cw > maxRight) maxRight = cx + cw;
+    if (cy + ch > maxBottom) maxBottom = cy + ch;
+  }
+
+  // Required size = union extent + right/bottom padding.
+  // Top + left padding is already baked into child.x / child.y by ELK
+  // (because we passed `elk.padding` with top/left values).
+  const requiredW = maxRight + CLUSTER_PADDING;
+  const requiredH = maxBottom + CLUSTER_PADDING;
+
+  // GROW only — never shrink. ELK may already have given the parent more
+  // width than its children need (mrtree centers ranks symmetrically and
+  // sometimes pads); shrinking that down would cause sibling overlap at
+  // the parent-of-parent level.
+  const currentW = node.width ?? 0;
+  const currentH = node.height ?? 0;
+  if (requiredW > currentW) node.width = requiredW;
+  if (requiredH > currentH) node.height = requiredH;
+}
+
 function flattenLaidOut(
   laid: ElkNode,
   visibleIndex: Map<string, VisibleEntry>,
@@ -455,6 +524,11 @@ export async function computeTreeLayout(
       algorithm: "mrtree",
       cacheKey: `${cacheKey}/root-${i}`,
     });
+    // Bug #1 (image #16) — tighten compound-node bboxes bottom-up so an
+    // expanded sub-cluster never overflows its parent. mrtree's container
+    // sizing isn't always tight enough for nested expansions; this fixes
+    // it without changing any leaf positions.
+    tightenContainmentBboxes(laid);
     elkRoots.push(laid);
   }
   packTopLevel(elkRoots);

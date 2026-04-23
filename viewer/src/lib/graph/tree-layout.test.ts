@@ -183,6 +183,99 @@ describe("computeTreeLayout — determinism", () => {
   });
 });
 
+describe("computeTreeLayout — containment bbox tightening (Bug #1)", () => {
+  beforeEach(() => __clearLayoutCache());
+
+  /**
+   * Builds a graph with deeply nested clusters that previously triggered the
+   * Bug #1 overflow on the xlarge fixture: top → mid → 16 leaves. With both
+   * top and mid expanded, mid's expanded footprint must fit inside top's
+   * dimensions OR top must grow to contain it. Either way, the invariant is
+   * "no child ever overflows its parent's declared bbox".
+   */
+  function deeplyNestedGraph(): Graph {
+    const files = [];
+    for (let i = 0; i < 16; i++) {
+      files.push(mkFile(`leaf${i}`, "top/mid"));
+    }
+    return {
+      version: 2,
+      root: ".",
+      files,
+      edges: [],
+      clusters: [
+        {
+          path: "top",
+          parent: null,
+          childFiles: [],
+          childClusters: ["top/mid"],
+          kind: "folder",
+        },
+        {
+          path: "top/mid",
+          parent: "top",
+          childFiles: files.map((f) => f.id),
+          childClusters: [],
+          kind: "folder",
+        },
+      ],
+    };
+  }
+
+  it("expanded child cluster never overflows its parent's bbox", async () => {
+    const result = await computeTreeLayout(
+      deeplyNestedGraph(),
+      new Set(["top", "top/mid"]),
+    );
+    // Build an id → laid-out-node map.
+    const byId = new Map(result.nodes.map((n) => [n.id, n] as const));
+    const top = byId.get("top");
+    const mid = byId.get("top/mid");
+    expect(top).toBeDefined();
+    expect(mid).toBeDefined();
+    if (!top || !mid) return;
+    // mid is parent-relative inside top. Its right/bottom must fit inside
+    // top's width/height (with a small float-rounding tolerance).
+    const midRight = mid.x + mid.width;
+    const midBottom = mid.y + mid.height;
+    expect(midRight).toBeLessThanOrEqual(top.width + 1);
+    expect(midBottom).toBeLessThanOrEqual(top.height + 1);
+  });
+
+  it("expanded leaf files never overflow their parent cluster's bbox", async () => {
+    const result = await computeTreeLayout(
+      deeplyNestedGraph(),
+      new Set(["top", "top/mid"]),
+    );
+    const byId = new Map(result.nodes.map((n) => [n.id, n] as const));
+    const mid = byId.get("top/mid");
+    expect(mid).toBeDefined();
+    if (!mid) return;
+    // Every file with parent === "top/mid" must fit within mid.
+    for (const n of result.nodes) {
+      if (n.parent !== "top/mid") continue;
+      const right = n.x + n.width;
+      const bottom = n.y + n.height;
+      expect(right).toBeLessThanOrEqual(mid.width + 1);
+      expect(bottom).toBeLessThanOrEqual(mid.height + 1);
+    }
+  });
+
+  it("simple expand of a single child cluster still respects containment", async () => {
+    // Smaller, simpler nested graph — proves the fix isn't only kicking in
+    // at scale. nestedGraph() has a/x with 3 files; a contains af0 + a/x.
+    const result = await computeTreeLayout(nestedGraph(), new Set(["a", "a/x"]));
+    const byId = new Map(result.nodes.map((n) => [n.id, n] as const));
+    const a = byId.get("a");
+    const ax = byId.get("a/x");
+    expect(a).toBeDefined();
+    expect(ax).toBeDefined();
+    if (!a || !ax) return;
+    expect(ax.x + ax.width).toBeLessThanOrEqual(a.width + 1);
+    expect(ax.y + ax.height).toBeLessThanOrEqual(a.height + 1);
+  });
+});
+
 describe("computeTreeLayout — empty / edge cases", () => {
   beforeEach(() => __clearLayoutCache());
 
