@@ -1,19 +1,10 @@
 # Pipeline Status
 
-**Updated:** 2026-04-22 (overnight autonomous run complete)
+**Updated:** 2026-04-22 (tree-layout-redesign finalized)
 
 ## Active
 
-_(idle — awaiting human review)_
-
-## ⭐ START HERE (morning pickup)
-
-**Open PR #1** https://github.com/sgupta604/viva/pull/1 — ship-ready state after overnight fix cycle.
-
-1. **Update PR body:** paste `.claude/features/large-codebase-viewer/PR-BODY.md` over the existing PR description (the pre-fix body no longer reflects reality).
-2. **Read** `.claude/active-work/large-codebase-viewer/session-log.md` (local-only, gitignored) for the full overnight narrative — what broke, what fixed it, test-coverage lessons.
-3. **Test locally** per PR-BODY.md's test plan — viva first, then your Coder-instance company codebase.
-4. **Merge when happy.** Main is clean; branch is 28 commits ahead.
+_(idle — no active feature)_
 
 ## Reminders
 
@@ -38,7 +29,8 @@ _(empty — up to user to decide what's next after merge)_
 
 | Feature | Date | PR / Merge |
 |---------|------|----|
-| large-codebase-viewer | 2026-04-22 | [PR #1](https://github.com/sgupta604/viva/pull/1) open (28 commits), **ship-ready, awaiting review** |
+| tree-layout-redesign | 2026-04-22 | [PR #1](https://github.com/sgupta604/viva/pull/1) open (39 commits), **ready to merge** — dendrogram default, 3-pill toggle, focus-revealed palette, scale-tested to 10k |
+| large-codebase-viewer | 2026-04-22 | [PR #1](https://github.com/sgupta604/viva/pull/1) — subsumed by tree-layout-redesign on the same branch |
 | xml-viewer-hardening | 2026-04-21 | merged to main (fast-forward, 14 commits, tip `d1ed38b`) |
 | v1-demo | 2026-04-18 | merged to main |
 | runtime-image | 2026-04-18 | merged to main |
