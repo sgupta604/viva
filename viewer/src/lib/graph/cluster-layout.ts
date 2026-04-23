@@ -74,12 +74,14 @@ export interface LaidOutGraphNode {
    */
   totalDescendantFiles?: number;
   /**
-   * Count of edges that retargeted to this cluster on BOTH endpoints — i.e.
-   * the edge connects two files inside the same collapsed cluster and would
-   * otherwise drop silently as a self-loop. The `↻ N` collapsed-cluster badge
+   * Count of edges that retargeted to this folder on BOTH endpoints — i.e.
+   * the edge connects two files inside the same collapsed folder and would
+   * otherwise drop silently as a self-loop. The `↻ N` collapsed-folder badge
    * surfaces this so users can tell at a glance whether activity is hidden.
-   * Only populated for cluster nodes; only meaningful when the cluster is
-   * collapsed (when expanded, the underlying edges are visible directly).
+   * Populated for `cluster` nodes (cluster + tree modes, rendered by
+   * ClusterNode) and for `treeFolder` nodes (dendrogram mode, rendered by
+   * TreeFolderNode). Only meaningful when the folder is collapsed; when
+   * expanded the underlying edges are visible directly.
    * Undefined / 0 → badge hidden (no `↻ 0` noise).
    */
   intraClusterEdgeCount?: number;

@@ -259,3 +259,50 @@ describe("computeDendrogramLayout — empty / edge cases", () => {
     expect(result.edges).toEqual([]);
   });
 });
+
+// Visual-review 2026-04-23 — extends polish-batch-1 item 1 to dendrogram
+// mode. With every folder rendered as a flat collapsed card, intra-folder
+// cross-ref edges retarget to a self-loop on the folder; we tally + surface
+// the count so TreeFolderNode can render the `↻ N` badge.
+describe("computeDendrogramLayout — intraClusterEdgeCount on treeFolder cards", () => {
+  beforeEach(() => __clearLayoutCache());
+
+  it("tallies edges between two files inside the same folder", async () => {
+    const g: Graph = {
+      version: 2,
+      root: ".",
+      files: [mkFile("af0", "a"), mkFile("af1", "a")],
+      edges: [
+        { source: "af0", target: "af1", kind: "include", unresolved: null },
+        { source: "af1", target: "af0", kind: "ref", unresolved: null },
+      ],
+      clusters: [
+        {
+          path: "a",
+          parent: null,
+          childFiles: ["af0", "af1"],
+          childClusters: [],
+          kind: "folder",
+        },
+      ],
+    };
+    const result = await computeDendrogramLayout(g, new Set());
+    const aNode = result.nodes.find(
+      (n) => n.id === "a" && n.kind === "treeFolder",
+    );
+    expect(aNode).toBeDefined();
+    expect(aNode?.intraClusterEdgeCount).toBe(2);
+  });
+
+  it("does NOT tally cross-folder edges", async () => {
+    const result = await computeDendrogramLayout(smallGraph(), new Set());
+    const aNode = result.nodes.find(
+      (n) => n.id === "a" && n.kind === "treeFolder",
+    );
+    const bNode = result.nodes.find(
+      (n) => n.id === "b" && n.kind === "treeFolder",
+    );
+    expect(aNode?.intraClusterEdgeCount).toBeUndefined();
+    expect(bNode?.intraClusterEdgeCount).toBeUndefined();
+  });
+});

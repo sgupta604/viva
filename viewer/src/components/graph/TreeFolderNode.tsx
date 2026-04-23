@@ -49,11 +49,26 @@ interface TreeFolderNodeProps {
      * computes subtree membership is `getDescendantIds`.
      */
     descendantOfFocus?: boolean;
+    /**
+     * Visual-review 2026-04-23 — count of edges between two files inside
+     * this folder that retargeted to it on both endpoints (i.e. would
+     * otherwise drop silently as self-loops in the dendrogram layout).
+     * Surfaces as a `↻ N` pill so users can see hidden activity at a
+     * glance, mirroring the polish-batch-1 item 1 affordance ClusterNode
+     * shows in cluster mode. Hidden when 0 / undefined (no `↻ 0` noise).
+     *
+     * In dendrogram mode every folder card is "collapsed" (the layout is
+     * flat — folders never become containment boxes), so this is wired
+     * unconditionally. The badge still hides at 0 to stay quiet.
+     */
+    intraClusterEdgeCount?: number;
   };
 }
 
 function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
-  const { cluster, expanded, childCount, descendantOfFocus } = data;
+  const { cluster, expanded, childCount, descendantOfFocus, intraClusterEdgeCount } =
+    data;
+  const showIntraBadge = (intraClusterEdgeCount ?? 0) > 0;
   const expand = useHierarchyStore((s) => s.expand);
   const collapse = useHierarchyStore((s) => s.collapse);
   const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
@@ -135,6 +150,15 @@ function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
       >
         {displayLabel}
       </div>
+      {showIntraBadge && (
+        <span
+          className="shrink-0 rounded bg-neutral-900 px-1.5 py-0.5 text-[9px] font-medium text-neutral-300"
+          title={`${intraClusterEdgeCount} edges between files inside this folder are hidden — expand to see them.`}
+          data-testid={`cluster-intra-badge-${cluster.path}`}
+        >
+          ↻ {intraClusterEdgeCount}
+        </span>
+      )}
       {childCount > 0 ? (
         <span className="shrink-0 rounded bg-neutral-900 px-1.5 py-0.5 text-[9px] font-medium text-neutral-300">
           {childCount}

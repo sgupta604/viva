@@ -286,3 +286,50 @@ describe("computeTreeLayout — empty / edge cases", () => {
     expect(result.edges).toEqual([]);
   });
 });
+
+// Visual-review 2026-04-23 — extends polish-batch-1 item 1 to tree mode.
+// When the dendrogram-style folder/file layout collapses two siblings'
+// shared-folder cross-ref edges into a self-loop on the folder, we tally
+// the count and surface it on the cluster node so ClusterNode can render
+// the `↻ N` collapsed-folder badge.
+describe("computeTreeLayout — intraClusterEdgeCount on collapsed folders", () => {
+  beforeEach(() => __clearLayoutCache());
+
+  it("tallies edges between two files inside the same collapsed folder", async () => {
+    // Both files live under `a`. With `a` collapsed, the edge retargets
+    // to (a, a) — a self-loop — which we count and surface as
+    // intraClusterEdgeCount.
+    const g: Graph = {
+      version: 2,
+      root: ".",
+      files: [mkFile("af0", "a"), mkFile("af1", "a")],
+      edges: [
+        { source: "af0", target: "af1", kind: "include", unresolved: null },
+        { source: "af1", target: "af0", kind: "ref", unresolved: null },
+      ],
+      clusters: [
+        {
+          path: "a",
+          parent: null,
+          childFiles: ["af0", "af1"],
+          childClusters: [],
+          kind: "folder",
+        },
+      ],
+    };
+    const result = await computeTreeLayout(g, new Set()); // a collapsed
+    const aNode = result.nodes.find((n) => n.id === "a");
+    expect(aNode).toBeDefined();
+    expect(aNode?.intraClusterEdgeCount).toBe(2);
+  });
+
+  it("does NOT tally edges between two files in DIFFERENT folders", async () => {
+    // Cross-folder edges retarget to (a, b) — drawable cross-ref, not a
+    // self-loop, so the count stays 0.
+    const result = await computeTreeLayout(smallGraph(), new Set());
+    const aNode = result.nodes.find((n) => n.id === "a");
+    const bNode = result.nodes.find((n) => n.id === "b");
+    expect(aNode?.intraClusterEdgeCount).toBeUndefined();
+    expect(bNode?.intraClusterEdgeCount).toBeUndefined();
+  });
+});

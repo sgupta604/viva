@@ -234,8 +234,10 @@ export function GraphCanvas() {
             // back to direct childCount for graphs that predate the fix.
             childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
             // polish-batch-1 item 1 — collapsed-cluster intra-edge count
-            // surfaced via the `↻ N` pill in ClusterNode. Cluster-mode only;
-            // dendrogram (treeFolder) intentionally not wired.
+            // surfaced via the `↻ N` pill in ClusterNode. Cluster mode +
+            // tree mode both reach this branch (both emit `kind: "cluster"`
+            // and render via ClusterNode). Dendrogram mode wires the same
+            // count through the `treeFolder` branch below to TreeFolderNode.
             intraClusterEdgeCount: n.intraClusterEdgeCount,
           },
           style: { width: n.width, height: n.height },
@@ -282,6 +284,12 @@ export function GraphCanvas() {
             // reads as 0 for parents whose files live in nested folders.
             childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
             descendantOfFocus,
+            // Collapsed-folder intra-edge count (visual-review 2026-04-23
+            // — extends polish-batch-1 item 1 from cluster mode to
+            // dendrogram mode). TreeFolderNode renders the same `↻ N`
+            // pill ClusterNode does whenever this is > 0; hidden when
+            // 0/undefined to keep the no-noise rule.
+            intraClusterEdgeCount: n.intraClusterEdgeCount,
           },
           style: { width: n.width, height: n.height },
           selectable: false,

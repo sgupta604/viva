@@ -176,7 +176,12 @@ test.describe("Post-finalize blocker fixes", () => {
 
     const top = page.getByTestId("cluster-top00");
     await expect(top).toBeVisible();
-    const badgeText = await top.locator("span.shrink-0").first().textContent();
+    // The descendant-count badge is the LAST shrink-0 span on the card. The
+    // FIRST shrink-0 span is now the `↻ N` intra-edge badge (polish-batch-1
+    // item 1 + visual-review 2026-04-23 follow-up); use `.last()` so the
+    // assertion still locks the correct badge whether or not the intra-edge
+    // pill is present on a given fixture.
+    const badgeText = await top.locator("span.shrink-0").last().textContent();
     const n = Number.parseInt((badgeText ?? "").trim(), 10);
     expect(
       n,
