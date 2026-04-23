@@ -1,5 +1,6 @@
 import { useViewStore, type SortBy, type ViewMode } from "@/lib/state/view-store";
 import { GraphLayoutToggle } from "./GraphLayoutToggle";
+import { DetailPanelToggle } from "./DetailPanelToggle";
 
 const MODES: { id: ViewMode; label: string }[] = [
   { id: "graph", label: "Graph" },
@@ -49,7 +50,12 @@ export function ViewModeBar() {
         })}
       </div>
 
-      {viewMode === "graph" && <GraphLayoutToggle />}
+      {viewMode === "graph" && (
+        <>
+          <GraphLayoutToggle />
+          <DetailPanelToggle />
+        </>
+      )}
 
       {viewMode !== "graph" && (
         <div className="flex items-center gap-2" data-testid="view-mode-sort-controls">

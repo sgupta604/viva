@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useViewStore, __VIEW_STORE_INTERNALS } from "./view-store";
 
-const { GRAPH_LAYOUT_STORAGE_KEY, LEGEND_COLLAPSED_STORAGE_KEY } =
-  __VIEW_STORE_INTERNALS;
+const {
+  GRAPH_LAYOUT_STORAGE_KEY,
+  LEGEND_COLLAPSED_STORAGE_KEY,
+  AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY,
+} = __VIEW_STORE_INTERNALS;
 
 describe("view store", () => {
   beforeEach(() => {
@@ -15,9 +18,11 @@ describe("view store", () => {
       sortDir: "asc",
       graphLayout: "dendrogram",
       legendCollapsed: false,
+      autoOpenDetailPanel: true,
     });
     window.localStorage.removeItem(GRAPH_LAYOUT_STORAGE_KEY);
     window.localStorage.removeItem(LEGEND_COLLAPSED_STORAGE_KEY);
+    window.localStorage.removeItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY);
   });
 
   it("defaults viewMode to graph", () => {
@@ -134,5 +139,54 @@ describe("view store", () => {
 
     useViewStore.getState().setLegendCollapsed(false);
     expect(window.localStorage.getItem(LEGEND_COLLAPSED_STORAGE_KEY)).toBe("false");
+  });
+
+  // ------------------------------------------------------------------
+  // autoOpenDetailPanel — toggle for click-to-open detail panel
+  // ------------------------------------------------------------------
+
+  it("defaults autoOpenDetailPanel to true (preserves historical click-to-open)", () => {
+    expect(useViewStore.getState().autoOpenDetailPanel).toBe(true);
+  });
+
+  it("setAutoOpenDetailPanel(false) writes through to localStorage", () => {
+    useViewStore.getState().setAutoOpenDetailPanel(false);
+    expect(useViewStore.getState().autoOpenDetailPanel).toBe(false);
+    expect(
+      window.localStorage.getItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY),
+    ).toBe("false");
+  });
+
+  it("setAutoOpenDetailPanel(true) writes through to localStorage", () => {
+    useViewStore.getState().setAutoOpenDetailPanel(false);
+    useViewStore.getState().setAutoOpenDetailPanel(true);
+    expect(useViewStore.getState().autoOpenDetailPanel).toBe(true);
+    expect(
+      window.localStorage.getItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY),
+    ).toBe("true");
+  });
+
+  it("rehydrates stored false value on store init (user opted out)", async () => {
+    window.localStorage.setItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY, "false");
+    const { vi } = await import("vitest");
+    vi.resetModules();
+    const fresh = await import("./view-store");
+    expect(fresh.useViewStore.getState().autoOpenDetailPanel).toBe(false);
+  });
+
+  it("rehydrates stored true value on store init", async () => {
+    window.localStorage.setItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY, "true");
+    const { vi } = await import("vitest");
+    vi.resetModules();
+    const fresh = await import("./view-store");
+    expect(fresh.useViewStore.getState().autoOpenDetailPanel).toBe(true);
+  });
+
+  it("ignores invalid localStorage values and falls back to true", async () => {
+    window.localStorage.setItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY, "garbage");
+    const { vi } = await import("vitest");
+    vi.resetModules();
+    const fresh = await import("./view-store");
+    expect(fresh.useViewStore.getState().autoOpenDetailPanel).toBe(true);
   });
 });

@@ -16,6 +16,7 @@ export function FolderView() {
   const sortBy = useViewStore((s) => s.sortBy);
   const sortDir = useViewStore((s) => s.sortDir);
   const selectFile = useSelectionStore((s) => s.selectFile);
+  const openDetailPanel = useSelectionStore((s) => s.openDetailPanel);
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
   const buckets = useMemo(() => {
@@ -57,7 +58,14 @@ export function FolderView() {
                 <li key={f.id}>
                   <button
                     type="button"
-                    onClick={() => selectFile(f.id)}
+                    // Folder-row click is always an explicit "show me this
+                    // file" intent (folder view has no graph edges), so
+                    // bypass the autoOpenDetailPanel toggle that gates
+                    // graph-tile clicks. Always open the panel.
+                    onClick={() => {
+                      selectFile(f.id);
+                      openDetailPanel();
+                    }}
                     data-testid={`folder-view-row-${f.id}`}
                     className={`flex w-full items-center gap-2 border-t border-neutral-800/50 px-3 py-1 text-left font-mono text-xs ${
                       active

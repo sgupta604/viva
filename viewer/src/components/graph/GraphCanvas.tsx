@@ -59,9 +59,11 @@ export function GraphCanvas() {
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
   const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
   const hoverNode = useSelectionStore((s) => s.hoverNode);
+  const openDetailPanel = useSelectionStore((s) => s.openDetailPanel);
   const expanded = useHierarchyStore((s) => s.expanded);
   const expand = useHierarchyStore((s) => s.expand);
   const graphLayout = useViewStore((s) => s.graphLayout);
+  const autoOpenDetailPanel = useViewStore((s) => s.autoOpenDetailPanel);
 
   const [zoomMode, setZoomMode] = useState<ZoomMode>("detail");
   // Listen for viewport changes; flip CSS class, never recompute layout.
@@ -550,7 +552,17 @@ export function GraphCanvas() {
           // File nodes are click-selectable (both `file` from cluster mode
           // and `treeFile` from dendrogram mode). Cluster / treeFolder
           // nodes have their own toggle handlers.
-          if (node.type === "file" || node.type === "treeFile") selectFile(node.id);
+          //
+          // Selection ALWAYS updates so the focus-revealed cross-ref palette
+          // + selection ring keep working regardless of the panel toggle.
+          // The detail panel only opens when `autoOpenDetailPanel` is true
+          // (default). Users who flip the toolbar setting off can click
+          // tiles purely to scan/trace edges without losing right-side
+          // real estate to the panel.
+          if (node.type === "file" || node.type === "treeFile") {
+            selectFile(node.id);
+            if (autoOpenDetailPanel) openDetailPanel();
+          }
         }}
         // Hover handlers drive the focus + context dimming of cross-ref
         // edges. The store update is cheap (one Zustand set), and React

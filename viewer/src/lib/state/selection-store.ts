@@ -22,10 +22,28 @@ interface SelectionState {
    * up the selected file's edges.
    */
   hoveredNodeId: string | null;
+  /**
+   * Whether the FileDetailPanel is visible. Decoupled from `selectedFileId`
+   * so a click can update selection (which drives the focus-revealed
+   * cross-ref palette + selection ring) without forcing the side panel
+   * open. Controlled by the view-store `autoOpenDetailPanel` setting at the
+   * call site (GraphCanvas) — selection-store itself is dumb about the
+   * preference; it just provides the open/close actions.
+   *
+   * Defaults to false. Becomes true when GraphCanvas opens it explicitly,
+   * the SearchPalette navigates to a file, or the toolbar "show panel"
+   * action runs. Becomes false when the panel close button fires, when Esc
+   * is pressed, or when `clear()` is called.
+   */
+  detailPanelOpen: boolean;
   selectFile: (id: string | null) => void;
   selectParam: (key: string | null) => void;
   /** Set the hovered node id, or clear with null. */
   hoverNode: (id: string | null) => void;
+  /** Show the FileDetailPanel. No-op selection (caller sets that). */
+  openDetailPanel: () => void;
+  /** Hide the FileDetailPanel. Leaves selection alone. */
+  closeDetailPanel: () => void;
   clear: () => void;
 }
 
@@ -33,9 +51,17 @@ export const useSelectionStore = create<SelectionState>((set) => ({
   selectedFileId: null,
   selectedParamKey: null,
   hoveredNodeId: null,
+  detailPanelOpen: false,
   selectFile: (id) => set({ selectedFileId: id, selectedParamKey: null }),
   selectParam: (key) => set({ selectedParamKey: key }),
   hoverNode: (id) => set({ hoveredNodeId: id }),
+  openDetailPanel: () => set({ detailPanelOpen: true }),
+  closeDetailPanel: () => set({ detailPanelOpen: false }),
   clear: () =>
-    set({ selectedFileId: null, selectedParamKey: null, hoveredNodeId: null }),
+    set({
+      selectedFileId: null,
+      selectedParamKey: null,
+      hoveredNodeId: null,
+      detailPanelOpen: false,
+    }),
 }));

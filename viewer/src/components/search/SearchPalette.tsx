@@ -11,6 +11,7 @@ interface Props {
 export function SearchPalette({ open, onOpenChange }: Props) {
   const graph = useGraphStore((s) => s.graph);
   const selectFile = useSelectionStore((s) => s.selectFile);
+  const openDetailPanel = useSelectionStore((s) => s.openDetailPanel);
   const [query, setQuery] = useState("");
 
   const fuse = useMemo(() => (graph ? buildIndex(graph) : null), [graph]);
@@ -46,7 +47,12 @@ export function SearchPalette({ open, onOpenChange }: Props) {
           data-testid="search-input"
           onKeyDown={(e) => {
             if (e.key === "Enter" && hits[0]) {
+              // Search hit is an EXPLICIT navigate-to intent — always open
+              // the detail panel regardless of the autoOpenDetailPanel
+              // setting. The user typed a name and pressed Enter; they
+              // want to see the file, not just select-and-trace.
               selectFile(hits[0].item.id);
+              openDetailPanel();
               onOpenChange(false);
             }
           }}
@@ -63,6 +69,7 @@ export function SearchPalette({ open, onOpenChange }: Props) {
                 data-testid={`search-hit-${hit.item.id}`}
                 onClick={() => {
                   selectFile(hit.item.id);
+                  openDetailPanel();
                   onOpenChange(false);
                 }}
               >

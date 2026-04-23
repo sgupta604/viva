@@ -36,6 +36,8 @@ export type GraphLayout = "dendrogram" | "tree" | "clusters";
 
 const GRAPH_LAYOUT_STORAGE_KEY = "viva.viewStore.graphLayout";
 const LEGEND_COLLAPSED_STORAGE_KEY = "viva.viewStore.legendCollapsed";
+const AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY =
+  "viva.viewStore.autoOpenDetailPanel";
 
 /**
  * SSR / private-window safe localStorage read. Returns undefined when storage
@@ -85,12 +87,53 @@ function writeLegendCollapsed(value: boolean): void {
   }
 }
 
+/**
+ * `autoOpenDetailPanel` controls whether clicking a file tile in the graph
+ * canvas force-opens the FileDetailPanel. Default `true` preserves the
+ * historical behavior; users who flip it off can click tiles purely to
+ * select/highlight them (drives the focus-revealed cross-ref palette and
+ * selection ring) WITHOUT the panel popping in. When OFF, the panel can
+ * still be opened via the search palette / explicit action — only the
+ * implicit click-to-open is suppressed.
+ */
+function readAutoOpenDetailPanel(): boolean | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = window.localStorage.getItem(AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY);
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+function writeAutoOpenDetailPanel(value: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY,
+      value ? "true" : "false",
+    );
+  } catch {
+    // ignore
+  }
+}
+
 interface ViewState {
   viewMode: ViewMode;
   sortBy: SortBy;
   sortDir: SortDir;
   graphLayout: GraphLayout;
   legendCollapsed: boolean;
+  /**
+   * When true (default), clicking a file tile in the graph canvas force-opens
+   * the FileDetailPanel. When false, clicking only updates selection state
+   * (selection ring + focus-revealed cross-ref palette stay) but the panel
+   * does NOT pop in. Useful for scanning/tracing edges without losing
+   * right-side real estate.
+   */
+  autoOpenDetailPanel: boolean;
   setViewMode: (m: ViewMode) => void;
   /**
    * Sort by `by`. If `dir` is omitted: clicking the current column toggles
@@ -101,6 +144,8 @@ interface ViewState {
   setGraphLayout: (layout: GraphLayout) => void;
   /** Toggle / set the EdgeLegend collapse state. Persists to localStorage. */
   setLegendCollapsed: (collapsed: boolean) => void;
+  /** Toggle the auto-open-on-click behavior for the detail panel. Persists. */
+  setAutoOpenDetailPanel: (value: boolean) => void;
 }
 
 export const useViewStore = create<ViewState>((set, get) => ({
@@ -111,6 +156,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
   // values for `tree` / `clusters` still rehydrate above.
   graphLayout: readGraphLayout() ?? "dendrogram",
   legendCollapsed: readLegendCollapsed() ?? false,
+  autoOpenDetailPanel: readAutoOpenDetailPanel() ?? true,
   setViewMode: (m) => set({ viewMode: m }),
   setSort: (by, dir) => {
     if (dir) {
@@ -132,10 +178,15 @@ export const useViewStore = create<ViewState>((set, get) => ({
     writeLegendCollapsed(collapsed);
     set({ legendCollapsed: collapsed });
   },
+  setAutoOpenDetailPanel: (value) => {
+    writeAutoOpenDetailPanel(value);
+    set({ autoOpenDetailPanel: value });
+  },
 }));
 
 // Exported for tests + future consumers that want to reset persistence.
 export const __VIEW_STORE_INTERNALS = {
   GRAPH_LAYOUT_STORAGE_KEY,
   LEGEND_COLLAPSED_STORAGE_KEY,
+  AUTO_OPEN_DETAIL_PANEL_STORAGE_KEY,
 };

@@ -8,7 +8,8 @@ type Tab = "params" | "raw";
 
 export function FileDetailPanel() {
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
-  const clear = useSelectionStore((s) => s.clear);
+  const detailPanelOpen = useSelectionStore((s) => s.detailPanelOpen);
+  const closeDetailPanel = useSelectionStore((s) => s.closeDetailPanel);
   const graph = useGraphStore((s) => s.graph);
   const [tab, setTab] = useState<Tab>("params");
 
@@ -17,7 +18,12 @@ export function FileDetailPanel() {
     return graph.files.find((f) => f.id === selectedFileId) ?? null;
   }, [selectedFileId, graph]);
 
-  if (!file) return null;
+  // Panel renders only when BOTH a file is selected AND the panel is open.
+  // Selection alone no longer forces the panel — the autoOpenDetailPanel
+  // view-store toggle gates whether a click implicitly opens it (see
+  // GraphCanvas onNodeClick wiring). Close button hides the panel without
+  // clearing selection so the focus-revealed edges stay lit.
+  if (!file || !detailPanelOpen) return null;
 
   return (
     <aside
@@ -51,7 +57,7 @@ export function FileDetailPanel() {
         </div>
         <button
           type="button"
-          onClick={clear}
+          onClick={closeDetailPanel}
           aria-label="close details"
           className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
         >

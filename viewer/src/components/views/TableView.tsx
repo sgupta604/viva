@@ -31,6 +31,7 @@ export function TableView() {
   const sortDir = useViewStore((s) => s.sortDir);
   const setSort = useViewStore((s) => s.setSort);
   const selectFile = useSelectionStore((s) => s.selectFile);
+  const openDetailPanel = useSelectionStore((s) => s.openDetailPanel);
   const selectedFileId = useSelectionStore((s) => s.selectedFileId);
 
   const rows = useMemo(() => {
@@ -92,7 +93,14 @@ export function TableView() {
               <tr
                 key={file.id}
                 data-testid={`table-view-row-${file.id}`}
-                onClick={() => selectFile(file.id)}
+                // Table-row click is always an explicit "show me this file"
+                // intent — table view has no graph edges to scan, so the
+                // autoOpenDetailPanel toggle (which gates graph-tile clicks)
+                // does not apply. Always open the panel here.
+                onClick={() => {
+                  selectFile(file.id);
+                  openDetailPanel();
+                }}
                 className={`cursor-pointer border-b border-neutral-800/50 font-mono ${
                   active
                     ? "bg-neutral-800 text-neutral-100"
