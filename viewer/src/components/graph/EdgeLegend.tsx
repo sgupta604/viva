@@ -6,6 +6,13 @@
  * fit-view button. Top-right keeps it out of the way of both the controls
  * and the bottom-right read-only hint.
  *
+ * Detail-panel avoidance (user QA 2026-04-22, Bug #7): the detail panel
+ * opens as a 400px-wide fixed aside anchored bottom-right top:96px. At a
+ * typical 1600-wide viewport it sits directly over the top-right legend.
+ * When a file is selected (panel open), shift the legend left so it clears
+ * the panel. 416px = 400px panel + 16px breathing margin, matching the
+ * 12px chip inset from the canvas edge.
+ *
  * Content varies by graph layout:
  *   - flat modes (dendrogram, tree) → compact 2-row legend (hierarchy +
  *     reference) — matches the 2-color flat palette in EdgeStyles.ts.
@@ -22,13 +29,16 @@
  * `useViewStore.legendCollapsed` so a reload remembers the user's choice.
  */
 import { useViewStore } from "@/lib/state/view-store";
+import { useSelectionStore } from "@/lib/state/selection-store";
 import { EDGE_KIND_META, TREE_LEGEND_ROWS } from "./EdgeStyles";
 
 export function EdgeLegend() {
   const collapsed = useViewStore((s) => s.legendCollapsed);
   const setCollapsed = useViewStore((s) => s.setLegendCollapsed);
   const graphLayout = useViewStore((s) => s.graphLayout);
+  const selectedFileId = useSelectionStore((s) => s.selectedFileId);
   const isFlatMode = graphLayout === "tree" || graphLayout === "dendrogram";
+  const panelOpen = selectedFileId !== null;
 
   // Build a unified row array so the JSX below stays single-shape; each
   // row carries its own data-testid suffix so existing per-kind selectors
@@ -52,11 +62,19 @@ export function EdgeLegend() {
         label: m.label,
       }));
 
+  // Inline `right` so the value can switch between two pixel literals
+  // (12px when no panel, 416px when the 400-px detail panel is open) —
+  // Tailwind's right-3 / right-[416px] would JIT both classes but the
+  // inline style is the simplest single-value swap and reads identically
+  // to the test that locks the position invariant.
+  const rightOffsetPx = panelOpen ? 416 : 12;
   return (
     <div
-      className="pointer-events-auto absolute right-3 top-3 z-20 rounded-md border border-neutral-700 bg-neutral-900/90 px-2 py-1.5 text-[11px] text-neutral-300 shadow-md backdrop-blur-sm"
+      className="pointer-events-auto absolute top-3 z-20 rounded-md border border-neutral-700 bg-neutral-900/90 px-2 py-1.5 text-[11px] text-neutral-300 shadow-md backdrop-blur-sm transition-all"
+      style={{ right: `${rightOffsetPx}px` }}
       data-testid="edge-legend"
       data-legend-mode={isFlatMode ? "tree" : "clusters"}
+      data-panel-open={panelOpen ? "true" : "false"}
       aria-label="edge color legend"
     >
       <button

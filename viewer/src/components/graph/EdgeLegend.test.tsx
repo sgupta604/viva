@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { EdgeLegend } from "./EdgeLegend";
 import { EDGE_KIND_META, TREE_LEGEND_ROWS } from "./EdgeStyles";
 import { useViewStore } from "@/lib/state/view-store";
+import { useSelectionStore } from "@/lib/state/selection-store";
 
 describe("EdgeLegend — clusters mode (full 6-row palette)", () => {
   beforeEach(() => {
@@ -98,18 +99,35 @@ describe("EdgeLegend — tree mode (compact 2-row palette)", () => {
 describe("EdgeLegend — positioning", () => {
   beforeEach(() => {
     useViewStore.setState({ legendCollapsed: false, graphLayout: "tree" });
+    useSelectionStore.setState({
+      selectedFileId: null,
+      selectedParamKey: null,
+      hoveredNodeId: null,
+    });
   });
 
-  it("anchors top-right (clears bottom-left React Flow Controls)", () => {
+  it("anchors top-right at 12px when no detail panel is open", () => {
     render(<EdgeLegend />);
     const chip = screen.getByTestId("edge-legend");
-    // The Tailwind class set is the source of truth for position; if a
-    // future tweak moves the legend back to bottom-left it will land on
-    // top of the fit-view button again, regressing user feedback
-    // 2026-04-22. Lock the anchor here.
-    expect(chip.className).toMatch(/\bright-3\b/);
+    // The position is now an inline `right` style so it can swap to clear
+    // the detail panel; the top-3 class still locks the vertical anchor.
     expect(chip.className).toMatch(/\btop-3\b/);
     expect(chip.className).not.toMatch(/\bbottom-3\b/);
     expect(chip.className).not.toMatch(/\bleft-3\b/);
+    expect((chip as HTMLElement).style.right).toBe("12px");
+    expect(chip.getAttribute("data-panel-open")).toBe("false");
+  });
+
+  it("shifts left to clear the 400px detail panel when a file is selected (Bug #7)", () => {
+    // Simulate a file selection — the FileDetailPanel renders bottom-right
+    // top:96px with width 400px and would otherwise cover the legend at
+    // typical viewport widths. The legend reads selection state and
+    // shifts to right=416 (panel + 16px breathing margin) so both stay
+    // visible without overlap.
+    useSelectionStore.setState({ selectedFileId: "some-file" });
+    render(<EdgeLegend />);
+    const chip = screen.getByTestId("edge-legend");
+    expect((chip as HTMLElement).style.right).toBe("416px");
+    expect(chip.getAttribute("data-panel-open")).toBe("true");
   });
 });
