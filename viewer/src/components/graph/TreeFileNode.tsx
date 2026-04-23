@@ -23,7 +23,17 @@ import { TREE_FILE_W, TREE_FILE_H } from "@/lib/graph/layout";
 import type { FileNode as FileNodeData } from "@/lib/graph/types";
 
 interface Props {
-  data: { file: FileNodeData };
+  data: {
+    file: FileNodeData;
+    /**
+     * True when this file lives in the subtree of the currently-focused
+     * folder cluster. Drives the "subtree highlight" ring — a subtler
+     * version of the direct hover ring — so the user can scan a column of
+     * stacked file cards and immediately see which ones belong to the
+     * folder they're hovering. Set by GraphCanvas via getDescendantIds.
+     */
+    descendantOfFocus?: boolean;
+  };
   selected: boolean;
 }
 
@@ -36,6 +46,7 @@ const KIND_DOT: Record<string, string> = {
 
 function TreeFileNodeInner({ data, selected }: Props) {
   const f = data.file;
+  const descendantOfFocus = data.descendantOfFocus ?? false;
   const selectedParamKey = useSelectionStore((s) => s.selectedParamKey);
   const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
   const graph = useGraphStore((s) => s.graph);
@@ -66,6 +77,16 @@ function TreeFileNodeInner({ data, selected }: Props) {
   const isHoverDisplaceSelection =
     selected && hoveredNodeId !== null && hoveredNodeId !== f.id;
 
+  // Ring priority cascade (highest → lowest):
+  //   1. Param-ref strong   — amber-400 (resolved param edge target)
+  //   2. Param-ref muted    — amber-400/40 (name-only param match)
+  //   3. Selection          — blue-400 (clicked file, suppressed if hover
+  //                                     elsewhere displaces focus)
+  //   4. Direct hover       — sky-300/60 (mouse on THIS tile)
+  //   5. Subtree highlight  — sky-300/40 (THIS tile is in the focused
+  //                                       folder's subtree — softer alpha
+  //                                       so the focused parent's own
+  //                                       hover ring still wins visually)
   const ring =
     highlight === "strong"
       ? "ring-2 ring-amber-400"
@@ -75,7 +96,9 @@ function TreeFileNodeInner({ data, selected }: Props) {
           ? "ring-2 ring-blue-400"
           : isHovered
             ? "ring-1 ring-sky-300/60"
-            : "";
+            : descendantOfFocus
+              ? "ring-1 ring-sky-300/40"
+              : "";
 
   // Light-blue fill for leaf files matches the reference image's leaf
   // styling. `generated` files dim slightly so the synthetic ones recede.
@@ -99,6 +122,7 @@ function TreeFileNodeInner({ data, selected }: Props) {
       data-testid={`node-${f.id}`}
       data-tree-file="true"
       data-generated={f.generated ? "true" : undefined}
+      data-descendant-of-focus={descendantOfFocus ? "true" : "false"}
       style={{ width: TREE_FILE_W, height: TREE_FILE_H }}
       className={`flex items-center gap-2 rounded-md border border-sky-700/50 bg-sky-950 px-2.5 py-1 text-left shadow-sm transition ${ring} ${generatedClass} ${parseFailClass}`}
     >

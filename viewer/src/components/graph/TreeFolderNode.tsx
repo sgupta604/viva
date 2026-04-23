@@ -40,11 +40,20 @@ interface TreeFolderNodeProps {
      * the badge value is "everything in this subtree", not direct only).
      */
     childCount: number;
+    /**
+     * True when THIS folder card lives in the subtree of the currently-
+     * focused folder cluster (and is not the focused folder itself). Drives
+     * the "subtree highlight" ring — a subtler version of the direct hover
+     * ring — so the user can see at a glance which sub-folders belong to
+     * the parent they're hovering. Set by GraphCanvas; the helper that
+     * computes subtree membership is `getDescendantIds`.
+     */
+    descendantOfFocus?: boolean;
   };
 }
 
 function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
-  const { cluster, expanded, childCount } = data;
+  const { cluster, expanded, childCount, descendantOfFocus } = data;
   const expand = useHierarchyStore((s) => s.expand);
   const collapse = useHierarchyStore((s) => s.collapse);
   const hoveredNodeId = useSelectionStore((s) => s.hoveredNodeId);
@@ -74,7 +83,18 @@ function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
   // doesn't compete with the existing hover:bg-neutral-700 background
   // shift or get loud against the dim default state of unfocused edges.
   const isHovered = hoveredNodeId === cluster.path;
-  const hoverRing = isHovered ? "ring-1 ring-sky-300/60" : "";
+  // Subtree-membership ring (user feedback 2026-04-22, "hover folder →
+  // light up subtree"): when this folder is a descendant of the focused
+  // folder, paint a softer 40%-alpha ring so it reads as "in the subtree"
+  // without competing with the direct hover ring (60%-alpha) on the
+  // focused folder itself. Direct hover wins if both apply (defensive — by
+  // construction GraphCanvas suppresses descendantOfFocus on the focused
+  // folder, so the && order is preference, not arbitration).
+  const hoverRing = isHovered
+    ? "ring-1 ring-sky-300/60"
+    : descendantOfFocus
+      ? "ring-1 ring-sky-300/40"
+      : "";
 
   return (
     <div
@@ -88,6 +108,7 @@ function TreeFolderNodeInner({ data }: TreeFolderNodeProps) {
       data-cluster-parent={cluster.parent ?? ""}
       data-tree-folder="true"
       data-expanded={expanded ? "true" : "false"}
+      data-descendant-of-focus={descendantOfFocus ? "true" : "false"}
       onClick={onToggle}
       onKeyDown={onKey}
       style={{ width: TREE_FOLDER_W, height: TREE_FOLDER_H }}

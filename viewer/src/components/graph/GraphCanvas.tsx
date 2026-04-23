@@ -22,6 +22,7 @@ import {
 } from "@/lib/graph/cluster-layout";
 import { computeTreeLayout } from "@/lib/graph/tree-layout";
 import { computeDendrogramLayout } from "@/lib/graph/dendrogram-layout";
+import { getDescendantIds, isFolderId } from "@/lib/graph/descendants";
 import {
   edgeStyleFor,
   shouldDisablePointerEvents,
@@ -173,6 +174,36 @@ export function GraphCanvas() {
 
   const layout = graphLayout === "clusters" ? clusterLayout : asyncLayout;
 
+  // "Hover folder, light up its subtree" affordance (user feedback
+  // 2026-04-22). When sibling folders are expanded side-by-side in
+  // dendrogram / tree mode, their children stack vertically with no visual
+  // binding back to their parent. We compute the descendant id set for the
+  // currently-focused node (hover takes priority over selection, matching
+  // the cross-ref dimming arbitration above) and pass a flag down to
+  // TreeFolderNode + TreeFileNode so they can paint a subtle ring on every
+  // tile in the subtree. The folder card itself sits in the set too (the
+  // helper is inclusive) so its own hover treatment stays in lockstep with
+  // its descendants.
+  //
+  // Cluster mode is intentionally exempt — its containment boxes already
+  // make subtree membership visually obvious; layering rings on top would
+  // double-up the visual without adding information.
+  //
+  // Files have no descendants, so when the focused node is a file the
+  // helper returns an empty set and the existing single-node-focus path
+  // (cross-ref edge dimming + tile hover ring) keeps working unchanged.
+  const isFlatMode = graphLayout === "dendrogram" || graphLayout === "tree";
+  const focusedNodeId = hoveredNodeId ?? selectedFileId;
+  const focusedFolderId = useMemo(() => {
+    if (!isFlatMode) return null;
+    if (!focusedNodeId) return null;
+    return isFolderId(focusedNodeId, graph) ? focusedNodeId : null;
+  }, [isFlatMode, focusedNodeId, graph]);
+  const subtreeIds = useMemo(
+    () => getDescendantIds(focusedFolderId, graph),
+    [focusedFolderId, graph],
+  );
+
   const rfNodes: Node[] = useMemo(() => {
     if (!layout) return [];
     return layout.nodes.map((n) => {
@@ -222,6 +253,19 @@ export function GraphCanvas() {
         // the dendrogram-layout E2E "expand state survives round-trip"
         // failure (folder.click() failing because d-aggregate hierarchy
         // edges sat above the card).
+        //
+        // `descendantOfFocus` is true when this folder card is in the
+        // subtree of the currently-focused folder (excluding the focused
+        // folder itself — its own hover ring already exists). TreeFolderNode
+        // reads this and paints a subtle sky-300/40 ring so the user can
+        // see at a glance which sub-folders belong to the hovered parent
+        // even when sibling folders are also expanded. Cluster mode skips
+        // this entirely because containment already shows scope.
+        const isFocusedFolder = n.id === focusedFolderId;
+        const descendantOfFocus =
+          focusedFolderId !== null &&
+          !isFocusedFolder &&
+          subtreeIds.has(n.id);
         return {
           id: n.id,
           type: "treeFolder",
@@ -233,6 +277,7 @@ export function GraphCanvas() {
             // Same total-descendant logic as ClusterNode — direct count
             // reads as 0 for parents whose files live in nested folders.
             childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
+            descendantOfFocus,
           },
           style: { width: n.width, height: n.height },
           selectable: false,
@@ -244,12 +289,22 @@ export function GraphCanvas() {
         // ReactFlow's onNodeClick handler below (consistent with FileNode).
         // zIndex: 1100 — same rationale as treeFolder above; keeps clicks
         // landing on the leaf card rather than on overlaid hierarchy edges.
+        //
+        // `descendantOfFocus` — same purpose as the treeFolder branch
+        // above. Files have no descendants of their own, so this only
+        // ever flips on when the FOCUSED node is a folder cluster that
+        // contains this file (directly or indirectly). TreeFileNode paints
+        // a subtle ring around its tile so the user can scan the column
+        // of stacked file cards and immediately see which ones live
+        // under the hovered folder.
+        const descendantOfFocus =
+          focusedFolderId !== null && subtreeIds.has(n.id);
         return {
           id: n.id,
           type: "treeFile",
           position: { x: n.x, y: n.y },
           zIndex: 1100,
-          data: { file: n.file! },
+          data: { file: n.file!, descendantOfFocus },
           selected: n.id === selectedFileId,
           style: { width: n.width, height: n.height },
           draggable: false,
@@ -276,12 +331,13 @@ export function GraphCanvas() {
         selected: n.id === selectedFileId,
       };
     });
-  }, [layout, selectedFileId]);
+  }, [layout, selectedFileId, focusedFolderId, subtreeIds]);
 
   // Both flat modes (dendrogram + tree) share the 2-color hierarchy/reference
   // edge palette and suppress always-on labels. Cluster mode keeps the full
   // 6-color palette + ×N chips (user said cluster info-density is fine).
-  const isFlatMode = graphLayout === "dendrogram" || graphLayout === "tree";
+  // (`isFlatMode` is hoisted above the rfNodes memo for the descendant-set
+  //  computation; reused here.)
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!layout) return [];
     return layout.edges.map((e) => {
@@ -345,7 +401,8 @@ export function GraphCanvas() {
       // a file's detail panel keeps that file's connections lit even after
       // the mouse moves away — matches the natural "I clicked this; show me
       // its world" mental model.
-      const focusedNodeId = hoveredNodeId ?? selectedFileId;
+      // (`focusedNodeId` is hoisted above the rfNodes memo for the
+      //  descendant-set computation; reused here.)
       // "Edge focused" — this edge's source or target IS the focused node.
       // Used by crossRefOpacityFor / crossRefInteractionWidthFor /
       // focusedCrossRefStrokeFor to decide whether THIS edge lights up.
@@ -358,13 +415,29 @@ export function GraphCanvas() {
       // touches the focused node.
       const anythingFocused = focusedNodeId !== null;
       const isHierarchyKind = e.kind === "d-aggregate";
+      // Subtree-hierarchy override (user feedback 2026-04-22, "hover folder
+      // → light up subtree"): when the focused node is a folder cluster in
+      // flat mode, hierarchy edges that connect nodes WITHIN that subtree
+      // pop back to full opacity. This is the visual cue that says "these
+      // tiles belong to me" — paired with the descendant rings on the tiles
+      // themselves it makes "which file is under which folder" obvious even
+      // when sibling folders are expanded side-by-side. `subtreeIds` is the
+      // empty set when no folder is focused, so the test naturally falls
+      // back to the regular hierarchyOpacityFor dim path.
+      const isHierarchyInSubtree =
+        isHierarchyKind &&
+        focusedFolderId !== null &&
+        subtreeIds.has(e.source) &&
+        subtreeIds.has(e.target);
       // Hierarchy edges dim to 0.4 when something is focused (backbone
       // recedes behind the lit cross-refs). Cross-ref edges dim to 0.15 by
       // default and light to full opacity when their endpoint is focused.
       // The `isFlatMode` arg is now a legacy positional slot — both helpers
       // ignore it and behave uniformly across all modes.
       const opacity = isHierarchyKind
-        ? hierarchyOpacityFor(isFlatMode, anythingFocused)
+        ? isHierarchyInSubtree
+          ? 1
+          : hierarchyOpacityFor(isFlatMode, anythingFocused)
         : crossRefOpacityFor(e.kind, isFlatMode, isFocused, anythingFocused);
       // Hit-target width must shrink in lockstep with the visible opacity
       // (user QA 2026-04-22): React Flow's invisible 20px-wide
@@ -476,7 +549,18 @@ export function GraphCanvas() {
         labelBgBorderRadius: 6,
       };
     });
-  }, [layout, selectedFileId, hoveredNodeId, isFlatMode]);
+  }, [
+    layout,
+    selectedFileId,
+    // `hoveredNodeId` deliberately excluded — `focusedNodeId =
+    // hoveredNodeId ?? selectedFileId` already participates in the deps
+    // and changes whenever hover changes, so listing both would re-trigger
+    // the memo twice on a hover transition.
+    focusedNodeId,
+    focusedFolderId,
+    subtreeIds,
+    isFlatMode,
+  ]);
 
   // Pre-layout state — render a stable skeleton instead of returning null.
   // Two reasons:
