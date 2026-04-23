@@ -35,11 +35,21 @@ interface ClusterNodeProps {
     cluster: ClusterNodeData;
     expanded: boolean;
     childCount: number;
+    /**
+     * polish-batch-1 item 1 — count of edges between two files inside this
+     * collapsed cluster that would otherwise drop silently as self-loops.
+     * Surfaces as a `↻ N` pill on the collapsed branch only; rendered
+     * immediately to the LEFT of the existing childCount badge. Hidden when
+     * 0 / undefined to avoid `↻ 0` noise (matches the user's "edges I can
+     * trust" / no-noise principle).
+     */
+    intraClusterEdgeCount?: number;
   };
 }
 
 function ClusterNodeInner({ data }: ClusterNodeProps) {
-  const { cluster, expanded, childCount } = data;
+  const { cluster, expanded, childCount, intraClusterEdgeCount } = data;
+  const showIntraBadge = !expanded && (intraClusterEdgeCount ?? 0) > 0;
   const expand = useHierarchyStore((s) => s.expand);
   const collapse = useHierarchyStore((s) => s.collapse);
 
@@ -106,6 +116,15 @@ function ClusterNodeInner({ data }: ClusterNodeProps) {
           >
             {displayLabel}
           </div>
+          {showIntraBadge && (
+            <span
+              className="shrink-0 rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300"
+              title={`${intraClusterEdgeCount} edges between files inside this folder are hidden — expand to see them.`}
+              data-testid={`cluster-intra-badge-${cluster.path}`}
+            >
+              ↻ {intraClusterEdgeCount}
+            </span>
+          )}
           <span className="shrink-0 rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] font-medium text-neutral-300">
             {childCount}
           </span>

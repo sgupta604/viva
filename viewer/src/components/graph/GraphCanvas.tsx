@@ -233,6 +233,10 @@ export function GraphCanvas() {
             // Badge shows TOTAL descendant file count (BLOCKER 2), falling
             // back to direct childCount for graphs that predate the fix.
             childCount: n.totalDescendantFiles ?? n.childCount ?? 0,
+            // polish-batch-1 item 1 — collapsed-cluster intra-edge count
+            // surfaced via the `↻ N` pill in ClusterNode. Cluster-mode only;
+            // dendrogram (treeFolder) intentionally not wired.
+            intraClusterEdgeCount: n.intraClusterEdgeCount,
           },
           style: { width: n.width, height: n.height },
           selectable: false,

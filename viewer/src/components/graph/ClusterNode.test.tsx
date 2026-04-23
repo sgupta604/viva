@@ -129,4 +129,56 @@ describe("ClusterNode", () => {
     expect(header.className).toContain("bg-neutral-900");
     expect(header.className).not.toMatch(/bg-neutral-900\/\d+/);
   });
+
+  // polish-batch-1 item 1 — collapsed-cluster intra-edge badge.
+  describe("intraClusterEdgeCount badge", () => {
+    it("renders ↻ N pill when collapsed and count > 0", () => {
+      const data = {
+        cluster: mkCluster("folder"),
+        expanded: false,
+        childCount: 3,
+        intraClusterEdgeCount: 7,
+      };
+      render(withProvider(<ClusterNode data={data} />));
+      // The pill renders as "↻ 7" (with a space).
+      expect(screen.getByText(/↻ 7/)).toBeInTheDocument();
+    });
+
+    it("hides the badge when count === 0", () => {
+      const data = {
+        cluster: mkCluster("folder"),
+        expanded: false,
+        childCount: 3,
+        intraClusterEdgeCount: 0,
+      };
+      render(withProvider(<ClusterNode data={data} />));
+      // No "↻ 0" — must not render at all.
+      expect(screen.queryByText(/↻/)).toBeNull();
+    });
+
+    it("hides the badge when count is undefined", () => {
+      const data = {
+        cluster: mkCluster("folder"),
+        expanded: false,
+        childCount: 3,
+        // intraClusterEdgeCount intentionally omitted
+      };
+      render(withProvider(<ClusterNode data={data} />));
+      expect(screen.queryByText(/↻/)).toBeNull();
+    });
+
+    it("hides the badge in expanded mode even when count > 0 (intra edges become visible)", () => {
+      // The expanded branch shows file children directly; the intra-cluster
+      // edges between them render as real edges, so the badge would be
+      // misleading. Cluster-mode only, collapsed-only.
+      const data = {
+        cluster: mkCluster("folder"),
+        expanded: true,
+        childCount: 3,
+        intraClusterEdgeCount: 7,
+      };
+      render(withProvider(<ClusterNode data={data} />));
+      expect(screen.queryByText(/↻/)).toBeNull();
+    });
+  });
 });
