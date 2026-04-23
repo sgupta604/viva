@@ -28,12 +28,22 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
-    // Query-param driven fixture selection (FPS bench). `?graph=large` loads
-    // /graph-large.json; default is /graph.json. Offline-safe — both files
-    // sit in the Vite-served public/ OR dist/ tree.
+    // Query-param driven fixture selection (FPS bench + scale tests):
+    //   ?graph=large    → /graph-large.json     (~3k files)
+    //   ?graph=xlarge   → /graph-xlarge.json    (~5k files)
+    //   ?graph=xxlarge  → /graph-xxlarge.json   (~10k files)
+    //   default         → /graph.json
+    // Offline-safe — all files sit in the Vite-served public/ OR dist/ tree.
     const params = new URLSearchParams(window.location.search);
+    const which = params.get("graph");
     const url =
-      params.get("graph") === "large" ? "/graph-large.json" : "/graph.json";
+      which === "xxlarge"
+        ? "/graph-xxlarge.json"
+        : which === "xlarge"
+          ? "/graph-xlarge.json"
+          : which === "large"
+            ? "/graph-large.json"
+            : "/graph.json";
     loadGraph(url)
       .then((result: LoadResult) => {
         if (cancelled) return;

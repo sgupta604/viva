@@ -132,9 +132,24 @@ export function GraphCanvas() {
       graphLayout === "dendrogram" ? computeDendrogramLayout : computeTreeLayout;
     const layoutName =
       graphLayout === "dendrogram" ? "computeDendrogramLayout" : "computeTreeLayout";
+    // Performance probe — zero-cost in production but lets devtools / scale
+    // tests pull layout-compute timing out of `performance.getEntriesByType`.
+    // Uses unique mark names per call so concurrent layouts don't collide.
+    const perfId = `${graphLayout}-${Date.now()}`;
+    performance.mark(`viva.layout.start.${perfId}`);
     layoutFn(filtered, expanded)
       .then((laid) => {
         if (stale) return;
+        performance.mark(`viva.layout.end.${perfId}`);
+        try {
+          performance.measure(
+            `viva.layout.${graphLayout}`,
+            `viva.layout.start.${perfId}`,
+            `viva.layout.end.${perfId}`,
+          );
+        } catch {
+          /* marks may have been cleared */
+        }
         setAsyncLayout(laid);
         setLayoutError(null);
       })

@@ -9,6 +9,10 @@ import {
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateLargeGraph } from "../src/lib/fixtures/large";
+import {
+  generateXLargeGraph,
+  generateXXLargeGraph,
+} from "../src/lib/fixtures/xlarge";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -50,21 +54,29 @@ export default async function globalSetup() {
   // Stage the synthesized large-scale fixture for the fps-bench + large-scale
   // specs. The JSON is not committed (too bulky) — regenerate on every run.
   // Seed=1 keeps the output byte-stable.
-  const large = generateLargeGraph(1);
-  const largeJson = JSON.stringify(large);
-  const largeDest = resolve(here, "fixtures/large/graph.json");
-  mkdirSync(dirname(largeDest), { recursive: true });
-  writeFileSync(largeDest, largeJson, "utf8");
-  // Also publish at /graph-large.json under public/ + dist/ so the viewer
-  // (running under vite preview) can load it via App.tsx's ?graph=large
-  // query-param dispatch.
+  stageSynth("large", JSON.stringify(generateLargeGraph(1)), here);
+
+  // Optional scale-test fixtures (xlarge ~5k, xxlarge ~10k). These exist so
+  // ad-hoc browser scale-tests can opt into them via ?graph=xlarge etc. They
+  // are NOT exercised by the default Playwright suite (regenerating two more
+  // multi-MB JSON files on every test run would slow startup with no benefit
+  // to the FPS-bench specs that are the gate). To re-enable for E2E, point a
+  // dedicated spec at them — the staging itself is fast enough.
+  stageSynth("xlarge", JSON.stringify(generateXLargeGraph(1)), here);
+  stageSynth("xxlarge", JSON.stringify(generateXXLargeGraph(1)), here);
+}
+
+function stageSynth(name: string, json: string, here: string): void {
+  const fixtureDest = resolve(here, `fixtures/${name}/graph.json`);
+  mkdirSync(dirname(fixtureDest), { recursive: true });
+  writeFileSync(fixtureDest, json, "utf8");
   for (const outPath of [
-    resolve(here, "../public/graph-large.json"),
-    resolve(here, "../dist/graph-large.json"),
+    resolve(here, `../public/graph-${name}.json`),
+    resolve(here, `../dist/graph-${name}.json`),
   ]) {
     if (outPath.includes("dist") && !existsSync(dirname(outPath))) continue;
     mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, largeJson, "utf8");
+    writeFileSync(outPath, json, "utf8");
   }
 }
 

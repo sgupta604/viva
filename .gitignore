@@ -5,11 +5,15 @@ viewer/test-results/
 viewer/playwright-report/
 viewer/public/graph.json
 viewer/public/graph-large.json
+viewer/public/graph-xlarge.json
+viewer/public/graph-xxlarge.json
 viewer/public/source/
 viewer/.vite/
 
-# Generated synthetic large-scale fixture (deterministic, regen at test time)
+# Generated synthetic large-scale fixtures (deterministic, regen at test time)
 viewer/e2e/fixtures/large/
+viewer/e2e/fixtures/xlarge/
+viewer/e2e/fixtures/xxlarge/
 
 # Viewer: TypeScript-emitted sidecar artifacts (tsc -b composite leftovers)
 viewer/*.tsbuildinfo
