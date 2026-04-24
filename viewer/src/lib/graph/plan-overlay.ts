@@ -22,13 +22,14 @@ import type { ClusterNode, FileNode, Graph } from "./types";
 import type {
   ComposedPlanGraph,
   Plan,
+  PlanNote,
   PlannedEdge,
   PlannedNode,
 } from "@/lib/state/plan-mode-types";
 
 const EMPTY_NODE_SET: ReadonlySet<string> = new Set();
 const EMPTY_EDGE_SET: ReadonlySet<string> = new Set();
-const EMPTY_NOTE_MAP: ReadonlyMap<string, never> = new Map();
+const EMPTY_NOTE_MAP: ReadonlyMap<string, PlanNote> = new Map();
 
 function isPlanEffectivelyEmpty(plan: Plan): boolean {
   const e = plan.edits;
@@ -77,7 +78,7 @@ export function composePlanGraph(
       graph: live,
       tombstonedNodeIds: EMPTY_NODE_SET,
       tombstonedEdgeKeys: EMPTY_EDGE_SET,
-      noteByTargetId: EMPTY_NOTE_MAP as ReadonlyMap<string, never>,
+      noteByTargetId: EMPTY_NOTE_MAP,
     };
   }
 

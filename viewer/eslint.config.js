@@ -32,6 +32,13 @@ const browserGlobals = {
   Storage: "readonly",
   URLSearchParams: "readonly",
   JSX: "readonly",
+  // Plan Mode (plan-ids.ts, plan-mode-store.ts) — randomUUID via WebCrypto
+  // and quota detection via DOMException.
+  crypto: "readonly",
+  DOMException: "readonly",
+  // performance.mark/measure used in GraphCanvas — pre-existing baseline
+  // lint warning we paved over while touching the global set for plan-mode.
+  performance: "readonly",
 };
 
 const nodeGlobals = {

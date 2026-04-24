@@ -213,6 +213,28 @@ describe("composePlanGraph — notes", () => {
   });
 });
 
+describe("composePlanGraph — Stream G integration invariant (GraphCanvas wire-up)", () => {
+  // This test mirrors what GraphCanvas does in its `composedGraph` useMemo.
+  // The point: when the wired selectors yield (planModeEnabled=false, plan=null),
+  // composePlanGraph(graph, null, false).graph === graph (REFERENCE EQUALITY),
+  // so the downstream `filtered` useMemo sees an unchanged dep and never
+  // re-runs spuriously. This is the contract that keeps Phase 1 invisible.
+  it("composePlanGraph(live, null, false).graph === live (reference equality, the GraphCanvas no-op case)", () => {
+    const live = makeGraph();
+    const out = composePlanGraph(live, null, false);
+    expect(out!.graph).toBe(live);
+  });
+
+  it("composePlanGraph(live, plan, false).graph === live even when plan has edits (toggle off wins)", () => {
+    const live = makeGraph();
+    const plan = makePlan({
+      addedNodes: [{ id: mintPlanNodeId(), name: "x", folder: "src", kind: "xml" }],
+    });
+    const out = composePlanGraph(live, plan, false);
+    expect(out!.graph).toBe(live);
+  });
+});
+
 describe("composePlanGraph — determinism + non-mutation", () => {
   it("two calls with the same input produce deep-equal output", () => {
     const live = makeGraph();

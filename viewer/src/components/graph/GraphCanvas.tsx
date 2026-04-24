@@ -15,6 +15,8 @@ import { useSelectionStore } from "@/lib/state/selection-store";
 import { useFilterStore } from "@/lib/state/filter-store";
 import { useHierarchyStore } from "@/lib/state/hierarchy-store";
 import { useViewStore } from "@/lib/state/view-store";
+import { usePlanModeStore } from "@/lib/state/plan-mode-store";
+import { composePlanGraph } from "@/lib/graph/plan-overlay";
 import { applyFilters } from "@/lib/filters/predicates";
 import {
   computeClusterLayout,
@@ -65,6 +67,15 @@ export function GraphCanvas() {
   const expand = useHierarchyStore((s) => s.expand);
   const graphLayout = useViewStore((s) => s.graphLayout);
   const autoOpenDetailPanel = useViewStore((s) => s.autoOpenDetailPanel);
+  // Plan Mode (Phase 1) — read-only composition. The composer is
+  // identity-passthrough by REFERENCE EQUALITY when planModeEnabled is false
+  // OR there's no active plan, so this wiring changes nothing visible until
+  // Phase 2 lands. Selectors read individual primitives so subscriptions stay
+  // narrow (re-rendering only when the relevant slice changes).
+  const planModeEnabled = usePlanModeStore((s) => s.planModeEnabled);
+  const activePlanId = usePlanModeStore((s) => s.activePlanId);
+  const plansById = usePlanModeStore((s) => s.plansById);
+  const activePlan = activePlanId ? plansById[activePlanId] ?? null : null;
 
   const [zoomMode, setZoomMode] = useState<ZoomMode>("detail");
   // Listen for viewport changes; flip CSS class, never recompute layout.
@@ -89,18 +100,30 @@ export function GraphCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph]);
 
-  const filtered = useMemo(() => {
+  // Plan Mode composition (Phase 1, Stream G — locked plan §1.8). When
+  // planModeEnabled is false OR activePlan is null, composePlanGraph returns
+  // the SAME `graph` reference (identity-passthrough), so this useMemo
+  // collapses to a pass-through and the downstream `filtered` memo never
+  // sees a change. The Phase 1 invariant is locked by Vitest in
+  // plan-overlay.test.ts AND the headless-invariant Playwright spec.
+  const composedGraph = useMemo(() => {
     if (!graph) return null;
+    const out = composePlanGraph(graph, activePlan, planModeEnabled);
+    return out?.graph ?? graph;
+  }, [graph, activePlan, planModeEnabled]);
+
+  const filtered = useMemo(() => {
+    if (!composedGraph) return null;
     // v2: folder filter → HIDE semantics is replaced by NAVIGATE (V.7). For
     // GraphCanvas we ignore state.folder and leave folder-driven navigation
     // to FilterBar's expandToPath + fitBounds.
-    return applyFilters(graph, {
+    return applyFilters(composedGraph, {
       kinds,
       hideTests,
       folder: null,
       searchQuery,
     });
-  }, [graph, kinds, hideTests, searchQuery]);
+  }, [composedGraph, kinds, hideTests, searchQuery]);
 
   // Cluster mode is sync (recursive grid-pack on the main thread); the two
   // flat modes (dendrogram, tree) are async (ELK mrtree via the elkjs Web
