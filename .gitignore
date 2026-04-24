@@ -59,3 +59,8 @@ Thumbs.db
 /*.jpeg
 /*.gif
 /*.webp
+
+# Stray crawler/whitelist test artifacts produced by manual agent verification runs.
+/source/
+/gl_*.json
+crawler/tests/fixtures/source/
