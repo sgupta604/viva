@@ -438,6 +438,18 @@ export function hydratePlanModeStore(): void {
 // Eagerly hydrate on module load (matches view-store top-level reads).
 hydratePlanModeStore();
 
+// E2E test hook — Playwright's `plan-mode-headless-invariant.spec.ts` calls
+// `window.__vivaPlanModeStore.getState().togglePlanMode()` to flip the toggle
+// without having any UI to click (Phase 1 has zero plan-mode chrome). viva
+// is a local-only, offline, no-backend viewer; exposing a Zustand store
+// handle on window has no meaningful "leak" surface and removes the need
+// for a separate test-build pipeline. Future phases can wire a real toggle
+// UI and remove this if desired.
+if (typeof window !== "undefined") {
+  (window as unknown as { __vivaPlanModeStore?: typeof usePlanModeStore }).__vivaPlanModeStore =
+    usePlanModeStore;
+}
+
 // ---------------------------------------------------------------------------
 // Test-only reset helper (NOT for production callers).
 // ---------------------------------------------------------------------------
