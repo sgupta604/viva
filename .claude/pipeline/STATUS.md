@@ -1,12 +1,12 @@
-# Pipeline Status
+﻿# Pipeline Status
 
-**Updated:** 2026-04-23 (plan-mode research kickoff)
+**Updated:** 2026-04-23 (plan-mode Phase 1 finalized — PR-A open)
 
 ## Active
 
 | Feature | Phase | Branch | Next |
 |---------|-------|--------|------|
-| plan-mode | phase-1-test-pass | feat/plan-mode | **Phase 1 ready** — 4 commits pushed (tip `96531ae`); 318 Vitest + 120 pytest + 95 Playwright all green; identity-passthrough invariant proven 3 ways; awaiting user local-poke → `/finalize` → PR-A |
+| plan-mode | phase-1-merged-pending-pr | feat/plan-mode | PR-A open (see below). After merge -> `/plan plan-mode` for Phase 2 refinement. Phase 2 visual-review gate WILL trigger. |
 
 ## Reminders
 
